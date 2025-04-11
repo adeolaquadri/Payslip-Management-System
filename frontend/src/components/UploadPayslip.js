@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { Container, Card, Form, Button } from "react-bootstrap";
 
 const UploadPayslip = () => {
   const [pdfFile, setPdfFile] = useState(null);
@@ -21,7 +22,7 @@ const UploadPayslip = () => {
     formData.append("excel", excelFile);
 
     try {
-      const response = await axios.post("http://localhost:4050/upload", formData);
+      const response = await axios.post("http://localhost:5000/upload", formData);
       toast.success(response.data.message);
     } catch (error) {
       toast.error("Error uploading files!");
@@ -29,17 +30,29 @@ const UploadPayslip = () => {
   };
 
   return (
-    <div className="container mt-4">
-      <h3>Upload Payslip PDF & Staff Excel</h3>
-      <div className="mb-3">
-        <input type="file" accept=".pdf" onChange={handlePdfChange} className="form-control" />
-      </div>
-      <div className="mb-3">
-        <input type="file" accept=".xlsx" onChange={handleExcelChange} className="form-control" />
-      </div>
-      <button className="btn btn-primary" onClick={handleUpload}>Upload</button>
+    <Container className="mt-5 d-flex justify-content-center">
+      <Card style={{ width: "100%", maxWidth: "600px" }} className="p-4 shadow-sm">
+        <Card.Body>
+          <h3 className="mb-4 text-center">Upload Payslip PDF & Excel</h3>
+          <Form>
+            <Form.Group controlId="formPdf" className="mb-3">
+              <Form.Label>Payslip PDF File</Form.Label>
+              <Form.Control type="file" accept=".pdf" onChange={handlePdfChange} />
+            </Form.Group>
+
+            <Form.Group controlId="formExcel" className="mb-4">
+              <Form.Label>Excel Staff Sheet</Form.Label>
+              <Form.Control type="file" accept=".xlsx" onChange={handleExcelChange} />
+            </Form.Group>
+
+            <Button variant="primary" onClick={handleUpload} className="w-100">
+              Upload
+            </Button>
+          </Form>
+        </Card.Body>
+      </Card>
       <ToastContainer />
-    </div>
+    </Container>
   );
 };
 

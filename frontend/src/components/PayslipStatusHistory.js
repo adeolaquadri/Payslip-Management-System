@@ -2,17 +2,14 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Container, Table, Badge } from "react-bootstrap";
 
-const PayslipStatus = () => {
+const PayslipStatusHistory = () => {
   const [payslips, setPayslips] = useState([]);
 
   useEffect(() => {
     const fetchStatus = async () => {
-      // axios.get("http://localhost:5000/status", {Credential: true})
-      //   .then(response => setPayslips(response.data))
-      //   .catch(error => console.error("Error fetching payslip status:", error));
 
         try {
-          const response = await axios.get("http://localhost:5000/status", { withCredentials: true });
+          const response = await axios.get("http://localhost:5000/status/history", { withCredentials: true });
           if (response.data) {
               setPayslips(response.data);
           }
@@ -35,6 +32,8 @@ const PayslipStatus = () => {
             <th>Staff ID</th>
             <th>Name</th>
             <th>Email</th>
+            <th>File</th>
+            <th>SentAt</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -44,6 +43,8 @@ const PayslipStatus = () => {
               <td>{payslip.staff_id}</td>
               <td>{payslip.name}</td>
               <td>{payslip.email}</td>
+              <td>{payslip.file}</td>
+              <td>{payslip.sentAt}</td>
               <td>
                 <Badge bg={payslip.status === "Sent" ? "success" : "danger"}>
                   {payslip.status}
@@ -57,4 +58,4 @@ const PayslipStatus = () => {
   );
 };
 
-export default PayslipStatus;
+export default PayslipStatusHistory;
