@@ -1,8 +1,11 @@
-import React from "react";
+// components/ProtectedRoute.js
+import { useContext } from "react";
 import { Navigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
 
-const PrivateRoute = ({ loggedIn, children }) => {
+const ProtectedRoute = ({ children }) => {
+  const { loggedIn } = useContext(AuthContext);
   return loggedIn ? children : <Navigate to="/login" />;
 };
 
-export default PrivateRoute;
+export default ProtectedRoute;

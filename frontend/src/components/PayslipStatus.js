@@ -1,16 +1,23 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Container, Table, Badge } from "react-bootstrap";
+import { useAuth } from "./context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const PayslipStatus = () => {
-  const [payslips, setPayslips] = useState([]);
+   const { loggedIn } = useAuth();
+   const navigate = useNavigate();
+   const [payslips, setPayslips] = useState([]);
+
+   useEffect(() => {
+           if (!loggedIn) {
+             navigate("/login");
+           }
+         }, [loggedIn, navigate]);
+         
 
   useEffect(() => {
     const fetchStatus = async () => {
-      // axios.get("http://localhost:5000/status", {Credential: true})
-      //   .then(response => setPayslips(response.data))
-      //   .catch(error => console.error("Error fetching payslip status:", error));
-
         try {
           const response = await axios.get("http://localhost:5000/status", { withCredentials: true });
           if (response.data) {

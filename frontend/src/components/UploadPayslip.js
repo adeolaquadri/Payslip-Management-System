@@ -25,7 +25,7 @@ const UploadPayslip = () => {
       const response = await axios.post("http://localhost:5000/upload", formData);
       toast.success(response.data.message);
     } catch (error) {
-      toast.error("Error uploading files!");
+      toast.error("Error uploading files!: ",error.message);
     }
   };
 

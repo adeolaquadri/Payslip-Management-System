@@ -1,13 +1,23 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Container, Table, Badge } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
 
 const PayslipStatusHistory = () => {
-  const [payslips, setPayslips] = useState([]);
+    const { loggedIn } = useAuth();
+    const navigate = useNavigate();
+    const [payslips, setPayslips] = useState([]);
 
-  useEffect(() => {
+    
+      useEffect(() => {
+        if (!loggedIn) {
+          navigate("/login");
+        }
+      }, [loggedIn, navigate]);
+      
+      useEffect(() => {
     const fetchStatus = async () => {
-
         try {
           const response = await axios.get("http://localhost:5000/status/history", { withCredentials: true });
           if (response.data) {
@@ -23,9 +33,17 @@ const PayslipStatusHistory = () => {
     return () => clearInterval(interval); // cleanup
   }, []);
 
+  function formatDateToDDMMYY(date) {
+    const day = String(date.getDate()).padStart(2, '0'); // Get day and pad it to 2 digits
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // Get month (0-indexed, so add 1) and pad
+    const year = String(date.getFullYear()).slice(-2); // Get the last two digits of the year
+  
+    return `${day}-${month}-${year}`;
+  }
+
   return (
     <Container className="mt-5">
-      <h3 className="mb-4 text-center">Payslip Processing Status</h3>
+      <h3 className="mb-4 text-center">Payslip Status History</h3>
       <Table striped bordered hover responsive>
         <thead className="table-primary">
           <tr>
@@ -44,7 +62,7 @@ const PayslipStatusHistory = () => {
               <td>{payslip.name}</td>
               <td>{payslip.email}</td>
               <td>{payslip.file}</td>
-              <td>{payslip.sentAt}</td>
+              <td>{formatDateToDDMMYY(new Date(payslip.sentAt))}</td>
               <td>
                 <Badge bg={payslip.status === "Sent" ? "success" : "danger"}>
                   {payslip.status}

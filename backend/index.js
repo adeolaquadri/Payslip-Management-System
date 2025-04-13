@@ -121,7 +121,7 @@ const sendPayslipEmail = async (email, filePath) => {
 let latestMatchedPayslips = [];
 
 // Upload endpoint
-app.post("/upload", verifyToken, upload.fields([{ name: "pdf" }, { name: "excel" }]), async (req, res) => {
+app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (req, res) => {
   if (!req.files.pdf || !req.files.excel) {
     console.warn("Both PDF and Excel files are required!"); // Log warning
     return res.status(400).json({ message: "Both PDF and Excel files are required!" });
@@ -172,6 +172,7 @@ app.get("/status/history", async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 })
+
 //Admin Signup
 app.post('/signup', async(req, res)=>{
   try {
@@ -179,10 +180,10 @@ app.post('/signup', async(req, res)=>{
     if (existingAdmin) {
       return res.status(403).json({ message: "Admin already exists. Registration closed." });
     }
-    const { email, password } = req.body;
+    const { email, password, secretkey } = req.body;
+    const hashedSecretKey = await bcryptjs.hash(secretkey, 10)
     const hashedPassword = await bcryptjs.hash(password, 10);
-
-    const newAdmin = new Admin({ email, password: hashedPassword });
+    const newAdmin = new Admin({ email, password: hashedPassword , secretkey: hashedSecretKey });
     await newAdmin.save();
 
     res.status(201).json({ message: "Admin registered successfully." });
@@ -211,15 +212,43 @@ app.post('/login', async(req, res)=>{
     const token = jsonwebtoken.sign(
       { adminId: admin._id, email: admin.email },
       process.env.secret_key,
-      { expiresIn: "1h" }
     );
       res.cookie("token", token, {
          httpOnly: true,
+         maxAge: 480000
       })
-      return res.json({message: "Login Successful!", user: req.user})
+      return res.status(200).json({message: "Login Successful!", user: req.user})
   } catch (error) {
     console.error("Login Error:", error);
     res.status(500).json({ message: "Internal server error." });
+  }
+})
+
+// Admin reset password
+app.put('/reset_password', async(req, res)=>{
+  try{
+    const { email, password, confirm, secretkey } = req.body;
+ 
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      return res.status(401).json({ message: "Invalid email address!" });
+    }
+    if(confirm !== password){
+      return res.status(403).json({ message: "Passwords do not match!"})
+    }
+    const isMatch = await bcryptjs.compare(secretkey, admin.secretkey);
+    if (!isMatch) {
+      return res.status(401).json({ message: "The secret key provided not found!"})
+    }
+    const hashedPassword = await bcryptjs.hash(password, 10);
+    const updatedAdmin = {
+      password: hashedPassword
+    }
+    const updateAdmin = await Admin.findByIdAndUpdate(admin._id, updatedAdmin, {new: true})
+    return res.status(200).json({message: "Password reset successfully!", admin: updateAdmin})    
+
+  }catch(e){
+    return res.status(500).json({ message: e.message})
   }
 })
 
@@ -250,7 +279,7 @@ app.delete('/admin', async(req, res)=>{
 
 // verify token from cookie
 app.get("/auth", (req, res) => {
-  const token = req.cookies?.token;
+  const token = req.cookies.token;
 
   if (!token) return res.json({ authenticated: false });
 
@@ -263,13 +292,14 @@ app.get("/auth", (req, res) => {
 });
 
 //Logout
-app.post('/logout', (req, res) => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    sameSite: 'Lax', // or 'None' with secure: true if you're using HTTPS
-    secure: process.env.NODE_ENV === 'production',
-  });
-  res.json({ message: 'Logged out successfully' });
+  app.post("/logout", (req, res) => {
+    res.clearCookie("token", {
+      httpOnly: true,
+      sameSite: "Lax", // or "Strict" depending on your setup
+      secure: false// if you're using HTTPS
+    });
+  
+    return res.status(200).json({ message: "Logged out successfully" });
 });
 
 
