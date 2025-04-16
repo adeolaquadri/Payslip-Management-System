@@ -5,23 +5,30 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAuth } from './context/AuthContext';
 import Footer from './Footer';
+import { useNavigate } from 'react-router-dom';
 
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const { setLoggedIn } = useAuth();
+  const navigate = useNavigate();
 
   const submitForm = async (event) => {
     event.preventDefault();
     try {
-      const response = await axios.post("http://localhost:5000/login", { email, password }, { withCredentials: true });
-      if (response.status === 200) {
+      const response = await axios.post("http://localhost:5000/login", { email, password },);
+      if (response.data.token) {
+        console.log(response.data.token)
+        // Store token in localStorage
+        localStorage.setItem("token", response.data.token);
+        // Optional: store user data
+        localStorage.setItem("user", JSON.stringify(response.data.user));
         setLoggedIn(true)
-        toast.success(response.data.message);
-        setInterval(()=>{window.location.href = '/'},5000)
-      } else {
-        toast.error(response.data.message);
+        navigate('/');
+      }else{
+        toast.error(response.data.message)
+        setLoggedIn(false)
       }
     } catch (error) {
       console.error("Login failed:", error.response?.data?.error || error.message);

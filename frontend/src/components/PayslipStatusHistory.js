@@ -8,20 +8,28 @@ const PayslipStatusHistory = () => {
     const { loggedIn } = useAuth();
     const navigate = useNavigate();
     const [payslips, setPayslips] = useState([]);
+    const [checked, setChecked] = useState(false);
+    
 
     
       useEffect(() => {
         if (!loggedIn) {
-          navigate("/login");
+          window.location.href = '/login'
+        }else{
+          setChecked(true)
         }
       }, [loggedIn, navigate]);
       
       useEffect(() => {
     const fetchStatus = async () => {
         try {
-          const response = await axios.get("http://localhost:5000/status/history", { withCredentials: true });
-          if (response.data) {
-              setPayslips(response.data);
+          const token = localStorage.getItem("token")
+          const response = await axios.get("http://localhost:5000/status/history", 
+            {headers: {
+              Authorization: `Bearer ${token}`,
+            },});
+          if(response.data.token) {
+            setPayslips(response.data.history);
           }
           }catch(error){
             console.error("Error fetching payslip status:", error)
@@ -36,11 +44,11 @@ const PayslipStatusHistory = () => {
   function formatDateToDDMMYY(date) {
     const day = String(date.getDate()).padStart(2, '0'); // Get day and pad it to 2 digits
     const month = String(date.getMonth() + 1).padStart(2, '0'); // Get month (0-indexed, so add 1) and pad
-    const year = String(date.getFullYear()).slice(-2); // Get the last two digits of the year
+    const year = String(date.getFullYear()).slice(); // Get the last two digits of the year
   
     return `${day}-${month}-${year}`;
   }
-
+  if (!checked) return <p className="text-center mt-5">Checking authentication...</p>;
   return (
     <Container className="mt-5">
       <h3 className="mb-4 text-center">Payslip Status History</h3>

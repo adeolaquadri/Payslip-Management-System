@@ -17,7 +17,7 @@ const ResetPassword = () => {
     event.preventDefault();
     try {
       const response = await axios.put("http://localhost:5000/reset_password", 
-         { email, secretkey, password, confirm }, { withCredentials: true });
+         { email, secretkey, password, confirm },);
       if (response.status === 200) {
         toast.success(response.data.message);
         setInterval(()=>{window.location.href = '/login'},5000)

@@ -22,8 +22,12 @@ const UploadPayslip = () => {
     formData.append("excel", excelFile);
 
     try {
-      const response = await axios.post("http://localhost:5000/upload", formData);
-      toast.success(response.data.message);
+      const token = localStorage.getItem("token")
+      const response = await axios.post("http://localhost:5000/upload", formData, 
+        {headers: {
+          Authorization: `Bearer ${token}`,
+        },});
+        toast.success(response.data.message);
     } catch (error) {
       toast.error("Error uploading files!: ",error.message);
     }

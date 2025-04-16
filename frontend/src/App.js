@@ -1,6 +1,6 @@
 import React from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
-import { Route, Routes } from "react-router-dom";
+import {BrowserRouter as Router, Routes, Route} from 'react-router-dom'
 import Signup from "./components/Signup.js";
 import Home from "./components/Home.js";
 import './App.css'
@@ -8,13 +8,13 @@ import Login from "./components/Login.js";
 import axios from "axios";
 import PayslipStatusHistory from "./components/PayslipStatusHistory.js";
 import ResetPassword from "./components/Resetpassword.js";
-import Logout from "./components/LogoutButton.js";
 
 axios.defaults.withCredentials = true;
 
 const App = () => {
 
   return (
+    <Router>
     <Routes>
     
       <Route path="/signup" element={<Signup />} />
@@ -22,8 +22,8 @@ const App = () => {
       <Route path="/login" element={<Login/>} />
       <Route path="/reset_password" element={<ResetPassword />} />
       <Route path="/" element={<Home />} />
-      <Route path="/logout" element={<Logout />} />
     </Routes>
+    </Router>
   )
 };
 

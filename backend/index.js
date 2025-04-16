@@ -14,6 +14,7 @@ import { verifyToken } from "./Middlewares/adminAuth.js";
 import bcryptjs from  "bcryptjs"
 import jsonwebtoken from "jsonwebtoken"
 import cookieParser from "cookie-parser"
+import nodemailer from "nodemailer"
 
 // Setup
 dotenv.config();
@@ -68,22 +69,36 @@ const matchPayslipsToEmailsByOrder = (payslipFiles, excelPath) => {
 
   for (let i = 0; i < payslipFiles.length; i++) {
     const record = staffRecords[i];
-    if (!record) continue; // Skip if no record
+    if (!record || !record.Email || !record.Email.includes("@")) continue;
 
-    // Only add valid records
-    if (record.Email && record.Email.includes("@")) {
-      matchedPaySlips.push({
-        staff_id: record["Employee ID"],
-        name: record.Name || "N/A",
-        email: record.Email,
-        file: payslipFiles[i],
-      });
-    }
+    const name = record.Name || "N/A";
+    const sanitizedFileName = name.replace(/[^a-z0-9]/gi, "_").toLowerCase(); // sanitize name for filename
+    const newFilePath = `uploads/${sanitizedFileName}.pdf`;
+
+    // Rename the original file
+    fs.renameSync(payslipFiles[i], newFilePath);
+
+    matchedPaySlips.push({
+      staff_id: record["Employee ID"],
+      name,
+      email: record.Email,
+      file: newFilePath,
+    });
   }
 
-  console.log(`Matched ${matchedPaySlips.length} payslips to emails`); // Log matches
+  console.log(`Matched ${matchedPaySlips.length} payslips to emails with employee names as filenames`);
   return matchedPaySlips;
 };
+
+// Configure Mailtrap's sandbox SMTP
+// const transporter = nodemailer.createTransport({
+//   host: "sandbox.smtp.mailtrap.io",
+//   port: 587,
+//   auth: {
+//     user: "5d50d399504707", // from Mailtrap > Email Testing > SMTP Settings
+//     pass: "b6b65a83e9bcfa",
+//   },
+// });
 
 // Send email with Resend
 const sendPayslipEmail = async (email, filePath) => {
@@ -116,6 +131,33 @@ const sendPayslipEmail = async (email, filePath) => {
     return "Failed";
   }
 };
+
+// const sendPayslipEmail = async (email, filePath) => {
+//   try {
+//     const content = fs.readFileSync(filePath);
+
+//     const mailOptions = {
+//       from: '"Payslip App (Dev)" <dev@payslip.local>',
+//       to: email,
+//       subject: "Your Monthly Payslip (Test)",
+//       text: "This is a test email from development. Please find the payslip attached.",
+//       attachments: [
+//         {
+//           filename: path.basename(filePath),
+//           content,
+//           contentType: "application/pdf",
+//         },
+//       ],
+//     };
+
+//     await transporter.sendMail(mailOptions);
+//     console.log(`Test email sent to ${email}`);
+//     return "Sent";
+//   } catch (err) {
+//     console.error(`Failed to send test email to ${email}:`, err);
+//     return "Failed";
+//   }
+// };
 
 // Global variable for storing latest matched payslips
 let latestMatchedPayslips = [];
@@ -163,10 +205,17 @@ app.get("/status", (req, res) => {
 });
 
 // Get status history
-app.get("/status/history", async (req, res) => {
+app.get("/status/history", verifyToken, async (req, res) => {
   try {
+      const authHeader = req.headers.authorization;
+      
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+          return res.status(401).json({ message: "Access Denied: No token provided" });
+          }
+    const token = authHeader.split(" ")[1];
+    const verified = jsonwebtoken.verify(token, process.env.secret_key);
     const history = await PayslipStatus.find().sort({ createdAt: -1 });
-    res.json(history);
+    res.json({history, token});
   } catch (err) {
     console.error("Error fetching status history:", err);
     res.status(500).json({ message: "Internal server error." });
@@ -200,24 +249,21 @@ app.post('/login', async(req, res)=>{
  
     const admin = await Admin.findOne({ email });
     if (!admin) {
-      return res.status(401).json({ message: "Invalid credentials." });
+      return res.status(401).json({ message: "Unauthorized Access!" });
     }
 
     const isMatch = await bcryptjs.compare(password, admin.password);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials." });
+      return res.status(401).json({ message: "Unauthorized Access!" });
     }
 
     // Generate JWT token (you can also use sessions instead)
     const token = jsonwebtoken.sign(
       { adminId: admin._id, email: admin.email },
-      process.env.secret_key,
-    );
-      res.cookie("token", token, {
-         httpOnly: true,
-         maxAge: 480000
-      })
-      return res.status(200).json({message: "Login Successful!", user: req.user})
+      process.env.secret_key, {
+        expiresIn: "1h",
+      });
+      return res.status(200).json({message: "Login Successful!", token, user: admin})
   } catch (error) {
     console.error("Login Error:", error);
     res.status(500).json({ message: "Internal server error." });
@@ -279,27 +325,22 @@ app.delete('/admin', async(req, res)=>{
 
 // verify token from cookie
 app.get("/auth", (req, res) => {
-  const token = req.cookies.token;
-
-  if (!token) return res.json({ authenticated: false });
-
   try {
-    const decoded = jsonwebtoken.verify(token, process.env.secret_key);
-    return res.json({ authenticated: true, user: decoded });
-  } catch (err) {
-    return res.json({ authenticated: false });
-  }
-});
+    const authHeader = req.headers.authorization;
 
-//Logout
-  app.post("/logout", (req, res) => {
-    res.clearCookie("token", {
-      httpOnly: true,
-      sameSite: "Lax", // or "Strict" depending on your setup
-      secure: false// if you're using HTTPS
-    });
-  
-    return res.status(200).json({ message: "Logged out successfully" });
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Access Denied: No token provided" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const verified = jsonwebtoken.verify(token, process.env.secret_key);
+
+    // You can send the user data back if needed
+    return res.status(200).json({ authenticated: true, user: verified });
+
+  } catch (error) {
+    return res.status(403).json({ message: "Invalid or expired token", error: error.message });
+  }
 });
 
 

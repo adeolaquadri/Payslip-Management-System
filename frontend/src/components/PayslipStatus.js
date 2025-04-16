@@ -11,7 +11,7 @@ const PayslipStatus = () => {
 
    useEffect(() => {
            if (!loggedIn) {
-             navigate("/login");
+             window.location.href = '/login'
            }
          }, [loggedIn, navigate]);
          
@@ -19,7 +19,11 @@ const PayslipStatus = () => {
   useEffect(() => {
     const fetchStatus = async () => {
         try {
-          const response = await axios.get("http://localhost:5000/status", { withCredentials: true });
+          const token = localStorage.getItem("token")
+          const response = await axios.get("http://localhost:5000/status", 
+            {headers: {
+              Authorization: `Bearer ${token}`,
+            },});
           if (response.data) {
               setPayslips(response.data);
           }

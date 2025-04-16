@@ -6,23 +6,38 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [loggedIn, setLoggedIn] = useState(false);
-  const [loading, setLoading] = useState(true); // Prevent flicker
+  const [loading, setLoading] = useState(true);
 
-  // Check login status using cookies on initial load
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await axios.get("http://localhost:5000/auth", { withCredentials: true });
-        setLoggedIn(response.data.authenticated); // true or false from backend
-      } catch (error) {
+  const checkAuth = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
         setLoggedIn(false);
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
 
+      const response = await axios.get("http://localhost:5000/auth", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setLoggedIn(response.data.authenticated);
+    } catch (error) {
+      console.error("Auth check failed:", error);
+      setLoggedIn(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (loggedIn) {
+      checkAuth(); // Double confirm when login changes
+    }
+  }, [loggedIn]);
 
   return (
     <AuthContext.Provider value={{ loggedIn, setLoggedIn }}>
