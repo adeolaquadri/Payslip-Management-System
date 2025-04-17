@@ -299,7 +299,7 @@ app.put('/reset_password', async(req, res)=>{
 })
 
 //Get Admin
-app.get('/admin', async(req, res)=>{
+app.get('/admin', verifyToken, async(req, res)=>{
   try{
     const admin = await Admin.find()
     if(!admin){ res.status(404).json({message: "Admin not found"})}
@@ -311,7 +311,7 @@ app.get('/admin', async(req, res)=>{
  }
 })
 // delete admin
-app.delete('/admin', async(req, res)=>{
+app.delete('/admin', verifyToken, async(req, res)=>{
   try{
     const admin = await Admin.deleteOne()
     if(!admin){res.status(404).json({message: "Admin not found"})
