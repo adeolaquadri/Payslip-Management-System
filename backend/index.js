@@ -90,16 +90,6 @@ const matchPayslipsToEmailsByOrder = (payslipFiles, excelPath) => {
   return matchedPaySlips;
 };
 
-// Configure Mailtrap's sandbox SMTP
-// const transporter = nodemailer.createTransport({
-//   host: "sandbox.smtp.mailtrap.io",
-//   port: 587,
-//   auth: {
-//     user: "5d50d399504707", // from Mailtrap > Email Testing > SMTP Settings
-//     pass: "b6b65a83e9bcfa",
-//   },
-// });
-
 // Send email with Resend
 const sendPayslipEmail = async (email, filePath) => {
   try {
@@ -132,33 +122,6 @@ const sendPayslipEmail = async (email, filePath) => {
   }
 };
 
-// const sendPayslipEmail = async (email, filePath) => {
-//   try {
-//     const content = fs.readFileSync(filePath);
-
-//     const mailOptions = {
-//       from: '"Payslip App (Dev)" <dev@payslip.local>',
-//       to: email,
-//       subject: "Your Monthly Payslip (Test)",
-//       text: "This is a test email from development. Please find the payslip attached.",
-//       attachments: [
-//         {
-//           filename: path.basename(filePath),
-//           content,
-//           contentType: "application/pdf",
-//         },
-//       ],
-//     };
-
-//     await transporter.sendMail(mailOptions);
-//     console.log(`Test email sent to ${email}`);
-//     return "Sent";
-//   } catch (err) {
-//     console.error(`Failed to send test email to ${email}:`, err);
-//     return "Failed";
-//   }
-// };
-
 // Global variable for storing latest matched payslips
 let latestMatchedPayslips = [];
 
@@ -186,7 +149,7 @@ app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (
         email: payslip.email,
         file: payslip.file,
         status,
-        sentAt: status === "Sent" ? new Date() : null,
+        sentAt: status === "Sent" ? new Date() : new Date(),
       });
     }
 
@@ -298,18 +261,6 @@ app.put('/reset_password', async(req, res)=>{
   }
 })
 
-//Get Admin
-app.get('/admin', verifyToken, async(req, res)=>{
-  try{
-    const admin = await Admin.find()
-    if(!admin){ res.status(404).json({message: "Admin not found"})}
-    else{
-       return res.status(200).json(admin)
-    }
- }catch(e){
-    return res.status(500).json({'Error': e.message})
- }
-})
 // delete admin
 app.delete('/admin', verifyToken, async(req, res)=>{
   try{
