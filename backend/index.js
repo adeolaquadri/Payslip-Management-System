@@ -6,6 +6,7 @@ import path from "path";
 import fs from "fs";
 import multer from "multer";
 import { PDFDocument } from "pdf-lib";
+import PDFParser from "pdf2json"
 import { Resend } from "resend";
 import mongoose from "mongoose";
 import Admin from "./models/Admin.js";
@@ -31,63 +32,86 @@ app.use(cors({
 }));
 
 // File upload config
+// Multer storage config
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
-
 const upload = multer({ storage });
+
 if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
 
-// Extract pages from PDF
-const extractPayslipPages = async (pdfPath) => {
-  const pdfDoc = await PDFDocument.load(fs.readFileSync(pdfPath));
-  const payslipFiles = [];
-
-  for (let i = 0; i < pdfDoc.getPageCount(); i++) {
-    const newPdfDoc = await PDFDocument.create();
-    const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [i]);
-    newPdfDoc.addPage(copiedPage);
-
-    const pdfBytes = await newPdfDoc.save();
-    const payslipPath = `uploads/payslip_${i + 1}.pdf`;
-    fs.writeFileSync(payslipPath, pdfBytes);
-    payslipFiles.push(payslipPath);
-  }
-
-  console.log(`Extracted ${payslipFiles.length} payslip pages from ${pdfPath}`); // Log extraction
-  return payslipFiles;
+// Function to extract text from PDF using pdf2json
+const extractTextFromPDFPage = (pdfPath, pageIndex) => {
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser();
+    pdfParser.on("pdfParser_dataError", err => reject(err));
+    pdfParser.on("pdfParser_dataReady", data => {
+      if (data && data.Pages && data.Pages[pageIndex]) {
+        const page = data.Pages[pageIndex];
+        const text = page.Texts.map(t => decodeURIComponent(t.R[0].T)).join(" ");
+        resolve(text);
+      } else {
+        reject(new Error(`No page at index ${pageIndex}`));
+      }
+    });
+    pdfParser.loadPDF(pdfPath);
+  });
 };
 
-// Match payslips to emails by order in Excel
-const matchPayslipsToEmailsByOrder = (payslipFiles, excelPath) => {
+// Match payslips by employee ID using pdf2json
+const matchPayslipsByEmployeeId = async (pdfFilePath, excelPath) => {
   const staffData = xlsx.readFile(excelPath);
   const staffSheet = staffData.Sheets[staffData.SheetNames[0]];
   const staffRecords = xlsx.utils.sheet_to_json(staffSheet);
 
-  const matchedPaySlips = [];
+  const pdfBuffer = fs.readFileSync(pdfFilePath);
+  const pdfDoc = await PDFDocument.load(pdfBuffer);
+  const matchedPayslips = [];
 
-  for (let i = 0; i < payslipFiles.length; i++) {
-    const record = staffRecords[i];
-    if (!record || !record.Email || !record.Email.includes("@")) continue;
+  for (let i = 0; i < pdfDoc.getPageCount(); i++) {
+    const page = pdfDoc.getPage(i);
+    const textContent = await extractTextFromPDFPage(pdfFilePath, i); // extract text from a specific page
 
-    const name = record.Name || "N/A";
-    const sanitizedFileName = name.replace(/[^a-z0-9]/gi, "_").toLowerCase(); // sanitize name for filename
-    const newFilePath = `uploads/${sanitizedFileName}.pdf`;
+    for (const record of staffRecords) {
+      const employeeId = String(record["IPPIS Number"]).trim();
 
-    // Rename the original file
-    fs.renameSync(payslipFiles[i], newFilePath);
+      if (new RegExp(`IPPIS Number[:\\s]*${employeeId}`, "i").test(textContent)) {
+        const email = record.Email;
+        if (!email || !email.includes("@")) continue;
 
-    matchedPaySlips.push({
-      staff_id: record["Employee ID"],
-      name,
-      email: record.Email,
-      file: newFilePath,
-    });
+        const name = record.Name || "employee";
+        const sanitizedName = name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+        const fileName = `${sanitizedName}_${employeeId}.pdf`;
+        const filePath = path.join("uploads", fileName);
+
+        await saveMatchedPageToPdf(pdfFilePath, i, filePath); // fixed page index
+
+        matchedPayslips.push({
+          staff_id: employeeId,
+          name,
+          email,
+          file: filePath
+        });
+      }
+    }
   }
 
-  console.log(`Matched ${matchedPaySlips.length} payslips to emails with employee names as filenames`);
-  return matchedPaySlips;
+  return matchedPayslips;
+};
+
+// Function to save only matched page from the original PDF into a new one
+const saveMatchedPageToPdf = async (pdfFilePath, pageIndex, outputPath) => {
+  const pdfDoc = await PDFDocument.load(fs.readFileSync(pdfFilePath));
+  const newPdfDoc = await PDFDocument.create();
+
+  // Copy the matched page from the original PDF to the new one
+  const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageIndex]);
+  newPdfDoc.addPage(copiedPage);
+
+  // Save the new PDF file with the matched page
+  const pdfBytes = await newPdfDoc.save();
+  fs.writeFileSync(outputPath, pdfBytes);
 };
 
 // Send email with Resend
@@ -104,67 +128,49 @@ const sendPayslipEmail = async (email, filePath) => {
         {
           filename: path.basename(filePath),
           content,
-          type: "application/pdf",
-        },
-      ],
+          type: "application/pdf"
+        }
+      ]
     });
 
     if (error) {
-      console.error(`Failed to send to ${email}:`, error); // Log error
+      console.error(`Failed to send to ${email}:`, error);
       return "Failed";
     }
 
-    console.log(`Successfully sent email to ${email}`); // Log success
+    console.log(`Successfully sent email to ${email}`);
     return "Sent";
   } catch (err) {
-    console.error(`Error sending to ${email}:`, err); // Log exception
+    console.error(`Error sending to ${email}:`, err);
     return "Failed";
   }
 };
 
-// Global variable for storing latest matched payslips
-let latestMatchedPayslips = [];
+const results = [];
 
-// Upload endpoint
+// Route to handle uploads
 app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (req, res) => {
-  if (!req.files.pdf || !req.files.excel) {
-    console.warn("Both PDF and Excel files are required!"); // Log warning
-    return res.status(400).json({ message: "Both PDF and Excel files are required!" });
-  }
-
-  const pdfPath = req.files.pdf[0].path;
-  const excelPath = req.files.excel[0].path;
-
   try {
-    const payslipFiles = await extractPayslipPages(pdfPath);
-    const matchedPayslips = matchPayslipsToEmailsByOrder(payslipFiles, excelPath);
+    const pdfFilePath = req.files.pdf[0].path;
+    const excelFilePath = req.files.excel[0].path;
 
-    for (const payslip of matchedPayslips) {
-      const status = await sendPayslipEmail(payslip.email, payslip.file);
-      payslip.status = status;
+    const matched = await matchPayslipsByEmployeeId(pdfFilePath, excelFilePath);
 
-      await PayslipStatus.create({
-        staff_id: payslip.staff_id,
-        name: payslip.name,
-        email: payslip.email,
-        file: payslip.file,
-        status,
-        sentAt: status === "Sent" ? new Date() : new Date(),
-      });
+    for (const match of matched) {
+      const status = await sendPayslipEmail(match.email, match.file);
+      results.push({ ...match, status });
     }
 
-    latestMatchedPayslips = matchedPayslips;
-    console.log("Payslips processed successfully!"); // Log successful processing
-    res.json({ message: "Payslips processed successfully!", matchedPayslips });
-  } catch (error) {
-    console.error("Error processing payslips:", error); // Log processing error
-    res.status(500).json({ message: "Internal server error." });
+    res.json({ message: "Payslips processed", results });
+  } catch (err) {
+    console.error("Upload error:", err);
+    res.status(500).json({ error: "Failed to process payslips" });
   }
 });
 
 // Status endpoint
 app.get("/status", (req, res) => {
-  res.json(latestMatchedPayslips);
+  res.json(results);
 });
 
 // Get status history
