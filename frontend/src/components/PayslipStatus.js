@@ -20,7 +20,7 @@ const PayslipStatus = () => {
     const fetchStatus = async () => {
         try {
           const token = localStorage.getItem("token")
-          const response = await axios.get("http://localhost:5000/status", 
+          const response = await axios.get("https://payslip-management-system.onrender.com/status", 
             {headers: {
               Authorization: `Bearer ${token}`,
             },});

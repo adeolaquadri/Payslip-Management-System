@@ -23,7 +23,7 @@ const UploadPayslip = () => {
 
     try {
       const token = localStorage.getItem("token")
-      const response = await axios.post("http://localhost:5000/upload", formData, 
+      const response = await axios.post("https://payslip-management-system.onrender.com/upload", formData, 
         {headers: {
           Authorization: `Bearer ${token}`,
         },});
