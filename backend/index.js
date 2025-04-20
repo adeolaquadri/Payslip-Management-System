@@ -28,7 +28,7 @@ app.use(express.json());
 app.use(cookieParser())
 app.use(cors({
   credentials: true,
-  origin: "https://payslip-management-system.vercel.app"
+  origin: "https://www.fcahptibbursaryps.com.ng"
 }));
 
 // File upload config
