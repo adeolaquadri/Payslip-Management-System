@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Footer from "./Footer.js";
+import axios from  "axios"
 
 const Home = () => {
   const navigate = useNavigate();
@@ -21,8 +22,7 @@ const Home = () => {
           return navigate("/login");
         }
 
-        const response = await fetch("https://www.fcahptibbursaryps.com.ng/auth", {
-          method: "GET",
+      const response = await axios.get("https://api.fcahptibbursaryps.com.ng/auth", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -32,9 +32,7 @@ const Home = () => {
           toast.error("Unauthorized. Redirecting to login.");
           return navigate("/login");
         }
-
-        const data = await response.json();
-        if (data.authenticated) {
+        if (response.data.authenticated) {
           setChecked(true);
         } else {
           navigate("/login");

@@ -22,7 +22,6 @@ const Login = () => {
       if (response.data.token) {
         // Store token and user info
         localStorage.setItem("token", response.data.token);
-        localStorage.setItem("user", JSON.stringify(response.data.user));
         navigate('/');
       }
     } catch (error) {
