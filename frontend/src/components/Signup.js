@@ -13,7 +13,7 @@ const Signup = ({ setUser }) => {
   const submitForm = async (event) => {
     event.preventDefault();
     try {
-      const response = await axios.post("https://payslip-management-system.onrender.com/signup", { email, password, secretkey }, { withCredentials: true });
+      const response = await axios.post("https://api.fcahptibbursaryps.com.ng/signup", { email, password, secretkey }, { withCredentials: true });
       if (response.status === 201) {
           toast.success(response.data.message);
           setInterval(()=>{window.location.href = '/login'},5000)

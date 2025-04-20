@@ -17,7 +17,7 @@ const Login = () => {
   const submitForm = async (event) => {
     event.preventDefault();
     try {
-      const response = await axios.post("https://payslip-management-system.onrender.com/login", { email, password },);
+      const response = await axios.post("https://api.fcahptibbursaryps.com.ng/login", { email, password },);
       if (response.data.token) {
         console.log(response.data.token)
         // Store token in localStorage

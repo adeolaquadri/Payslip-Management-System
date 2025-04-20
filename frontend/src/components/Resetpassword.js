@@ -16,7 +16,7 @@ const ResetPassword = () => {
   const submitForm = async (event) => {
     event.preventDefault();
     try {
-      const response = await axios.put("https://payslip-management-system.onrender.com/reset_password", 
+      const response = await axios.put("https://api.fcahptibbursaryps.com.ng/reset_password", 
          { email, secretkey, password, confirm },);
       if (response.status === 200) {
         toast.success(response.data.message);
