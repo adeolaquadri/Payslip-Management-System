@@ -120,7 +120,7 @@ const sendPayslipEmail = async (email, filePath) => {
     const content = fs.readFileSync(filePath).toString("base64");
 
     const { error } = await resend.emails.send({
-      from: "Payslip App <onboarding@resend.dev>",
+      from: "Payslip App <admin@fcahptibbursaryps.com.ng>",
       to: email,
       subject: "Your Monthly Payslip",
       text: "Please find your payslip attached.",

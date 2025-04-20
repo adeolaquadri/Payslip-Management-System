@@ -26,10 +26,11 @@ const Login = () => {
         localStorage.setItem("user", JSON.stringify(response.data.user));
         setLoggedIn(true)
         navigate('/');
-      }else{
-        toast.error(response.data.message)
-        setLoggedIn(false)
       }
+      // else{
+      //   toast.error(response.data.message)
+      //   setLoggedIn(false)
+      // }
     } catch (error) {
       console.error("Login failed:", error.response?.data?.error || error.message);
       toast.error(error.response?.data?.message || "Login failed");
