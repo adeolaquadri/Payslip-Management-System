@@ -16,6 +16,7 @@ const Home = () => {
     const checkAuth = async () => {
       try {
         const token = localStorage.getItem("token");
+        console.log(token)
 
         if (!token) {
           toast.error("Session expired. Please log in.");
@@ -27,8 +28,7 @@ const Home = () => {
             Authorization: `Bearer ${token}`,
           },
         });
-
-        if (!response.ok) {
+        if (!response) {
           toast.error("Unauthorized. Redirecting to login.");
           return navigate("/login");
         }
