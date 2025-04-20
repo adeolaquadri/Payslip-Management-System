@@ -32,7 +32,7 @@ const PayslipStatusHistory = () => {
             },
           }
         );
-        if (response.data.token) {
+        if (checked) {
           setPayslips(response.data.history);
         }
         setLoading(false);

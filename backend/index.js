@@ -184,7 +184,7 @@ app.get("/status/history", verifyToken, async (req, res) => {
     const token = authHeader.split(" ")[1];
     const verified = jsonwebtoken.verify(token, process.env.secret_key);
     const history = await PayslipStatus.find().sort({ createdAt: -1 });
-    res.json({history, token});
+    res.json({history});
   } catch (err) {
     console.error("Error fetching status history:", err);
     res.status(500).json({ message: "Internal server error." });
