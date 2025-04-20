@@ -21,6 +21,7 @@ const Login = () => {
 
       if (response.data.token) {
         // Store token and user info
+        console.log(response.data.token)
         localStorage.setItem("token", response.data.token);
         navigate('/');
       }
