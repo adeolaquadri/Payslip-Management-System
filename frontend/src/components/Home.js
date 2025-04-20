@@ -16,7 +16,6 @@ const Home = () => {
     const checkAuth = async () => {
       try {
         const token = localStorage.getItem("token");
-        console.log(token)
 
         if (!token) {
           toast.error("Session expired. Please log in.");
@@ -62,12 +61,12 @@ const Home = () => {
         <div className="container">
           <span className="navbar-brand">Payslip Management System</span>
           <div>
-            <button
+            {/* <button
               className="btn btn-outline-light me-2"
               onClick={() => navigate("/status/history")}
             >
               History
-            </button>
+            </button> */}
             <button className="btn btn-outline-light" onClick={handleLogout}>
               Logout
             </button>

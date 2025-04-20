@@ -6,7 +6,6 @@ import Home from "./components/Home.js";
 import './App.css'
 import Login from "./components/Login.js";
 import axios from "axios";
-import PayslipStatusHistory from "./components/PayslipStatusHistory.js";
 import ResetPassword from "./components/Resetpassword.js";
 
 axios.defaults.withCredentials = true;
@@ -18,7 +17,6 @@ const App = () => {
     <Routes>
     
       <Route path="/signup" element={<Signup />} />
-      <Route path="/status/history" element={<PayslipStatusHistory />} />
       <Route path="/login" element={<Login/>} />
       <Route path="/reset_password" element={<ResetPassword />} />
       <Route path="/" element={<Home />} />
