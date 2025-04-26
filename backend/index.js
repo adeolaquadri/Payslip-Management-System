@@ -61,48 +61,70 @@ const extractTextFromPDFPage = (pdfPath, pageIndex) => {
 
 // Match payslips by IPPIS Number using pdf2json
 const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
-  const staffData = xlsx.readFile(excelPath);
-  const staffSheet = staffData.Sheets[staffData.SheetNames[0]];
-  const staffRecords = xlsx.utils.sheet_to_json(staffSheet);
+// Step 1: Read and Preprocess Excel
+const staffData = xlsx.readFile(excelPath);
+const staffSheet = staffData.Sheets[staffData.SheetNames[0]];
+const staffRecords = xlsx.utils.sheet_to_json(staffSheet);
 
-  const pdfBuffer = fs.readFileSync(pdfFilePath);
-  const pdfDoc = await PDFDocument.load(pdfBuffer);
-  const matchedPayslips = [];
+const staffMap = new Map();
+for (const record of staffRecords) {
+  const ippisNumber = String(record["IPPIS Number"]).trim();
+  if (ippisNumber) {
+    staffMap.set(ippisNumber, record);
+  }
+}
 
-  for (let i = 0; i < pdfDoc.getPageCount(); i++) {
-    const textContent = await extractTextFromPDFPage(pdfFilePath, i); // extract text from a specific page
-    const cleanedText = textContent.replace(/\s+/g, ' ').trim(); // clean up spaces
+// Step 2: Read PDF
+const pdfBuffer = fs.readFileSync(pdfFilePath);
+const pdfDoc = await PDFDocument.load(pdfBuffer);
+const pageCount = pdfDoc.getPageCount();
 
-    for (const record of staffRecords) {
-      const ippisNumber = String(record["IPPIS Number"]).trim();
+// Step 3: Extract all pages in parallel
+const pageTexts = await Promise.all(
+  Array.from({ length: pageCount }).map((_, i) => extractTextFromPDFPage(pdfFilePath, i))
+);
 
-      // Improved regex matching
-      const regex = new RegExp(`IPPIS\\s*Number\\s*:\\s*${ippisNumber}`, "i");
+// Step 4: Match each page
+const matchedPayslips = [];
 
-      if (regex.test(cleanedText)) {
-        const email = record.Email;
-        if (!email || !email.includes("@")) continue;
+for (let i = 0; i < pageCount; i++) {
+  const cleanedText = pageTexts[i].replace(/\s+/g, ' ').trim();
 
-        const name = record.Name || "employee";
-        const sanitizedName = name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-        const fileName = `${sanitizedName}_${ippisNumber}.pdf`;
-        const filePath = path.join("uploads", fileName);
+  let foundMatch = false;
 
-        await saveMatchedPageToPdf(pdfFilePath, i, filePath); // fixed page index
+  for (const [ippisNumber, record] of staffMap.entries()) {
+    const regex = new RegExp(`IPPIS\\s*Number\\s*:\\s*${ippisNumber}`, "i");
 
-        matchedPayslips.push({
-          staff_id: ippisNumber,
-          name,
-          email,
-          file: filePath
-        });
+    if (regex.test(cleanedText)) {
+      const email = record.Email;
+      if (!email || !email.includes("@")) break; // skip if no valid email
 
-        break; // Once matched, no need to continue checking other records for this page
-      }
+      const name = record.Name || "employee";
+      const sanitizedName = name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      const fileName = `${sanitizedName}_${ippisNumber}.pdf`;
+      const filePath = path.join("uploads", fileName);
+
+      await saveMatchedPageToPdf(pdfFilePath, i, filePath);
+
+      matchedPayslips.push({
+        staff_id: ippisNumber,
+        name,
+        email,
+        file: filePath
+      });
+
+      staffMap.delete(ippisNumber); // optional: remove matched staff
+      foundMatch = true;
+      break; // found staff for this page, move on
     }
   }
 
-  return matchedPayslips;
+  if (!foundMatch) {
+    console.warn(`No matching staff found for page ${i + 1}`);
+  }
+}
+
+return matchedPayslips;
 };
 
 
