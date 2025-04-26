@@ -59,8 +59,8 @@ const extractTextFromPDFPage = (pdfPath, pageIndex) => {
   });
 };
 
-// Match payslips by employee ID using pdf2json
-const matchPayslipsByEmployeeId = async (pdfFilePath, excelPath) => {
+// Match payslips by IPPIS Number using pdf2json
+const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
   const staffData = xlsx.readFile(excelPath);
   const staffSheet = staffData.Sheets[staffData.SheetNames[0]];
   const staffRecords = xlsx.utils.sheet_to_json(staffSheet);
@@ -70,35 +70,41 @@ const matchPayslipsByEmployeeId = async (pdfFilePath, excelPath) => {
   const matchedPayslips = [];
 
   for (let i = 0; i < pdfDoc.getPageCount(); i++) {
-    const page = pdfDoc.getPage(i);
     const textContent = await extractTextFromPDFPage(pdfFilePath, i); // extract text from a specific page
+    const cleanedText = textContent.replace(/\s+/g, ' ').trim(); // clean up spaces
 
     for (const record of staffRecords) {
-      const employeeId = String(record["IPPIS Number"]).trim();
+      const ippisNumber = String(record["IPPIS Number"]).trim();
 
-      if (new RegExp(`IPPIS Number[:\\s]*${employeeId}`, "i").test(textContent)) {
+      // Improved regex matching
+      const regex = new RegExp(`IPPIS\\s*Number\\s*:\\s*${ippisNumber}`, "i");
+
+      if (regex.test(cleanedText)) {
         const email = record.Email;
         if (!email || !email.includes("@")) continue;
 
         const name = record.Name || "employee";
         const sanitizedName = name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-        const fileName = `${sanitizedName}_${employeeId}.pdf`;
+        const fileName = `${sanitizedName}_${ippisNumber}.pdf`;
         const filePath = path.join("uploads", fileName);
 
         await saveMatchedPageToPdf(pdfFilePath, i, filePath); // fixed page index
 
         matchedPayslips.push({
-          staff_id: employeeId,
+          staff_id: ippisNumber,
           name,
           email,
           file: filePath
         });
+
+        break; // Once matched, no need to continue checking other records for this page
       }
     }
   }
 
   return matchedPayslips;
 };
+
 
 // Function to save only matched page from the original PDF into a new one
 const saveMatchedPageToPdf = async (pdfFilePath, pageIndex, outputPath) => {
@@ -154,7 +160,7 @@ app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (
     const pdfFilePath = req.files.pdf[0].path;
     const excelFilePath = req.files.excel[0].path;
 
-    const matched = await matchPayslipsByEmployeeId(pdfFilePath, excelFilePath);
+    const matched = await matchPayslipsByIPPISNumber(pdfFilePath, excelFilePath);
 
     for (const match of matched) {
       const status = await sendPayslipEmail(match.email, match.file);
