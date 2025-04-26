@@ -113,7 +113,7 @@ for (let i = 0; i < pageCount; i++) {
         file: filePath
       });
 
-      staffMap.delete(ippisNumber); // optional: remove matched staff
+      // staffMap.delete(ippisNumber); // optional: remove matched staff
       foundMatch = true;
       break; // found staff for this page, move on
     }
@@ -174,15 +174,20 @@ const sendPayslipEmail = async (email, filePath) => {
   }
 };
 
-const results = [];
 
 // Route to handle uploads
 app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (req, res) => {
+  
+const results = [];
   try {
     const pdfFilePath = req.files.pdf[0].path;
     const excelFilePath = req.files.excel[0].path;
 
     const matched = await matchPayslipsByIPPISNumber(pdfFilePath, excelFilePath);
+    console.log("Matched Staffs:");
+     matched.forEach((payslip, index) => {
+  console.log(`${index + 1}. Name: ${payslip.name}, IPPIS: ${payslip.staff_id}, Email: ${payslip.email}`);
+});
 
     for (const match of matched) {
       const status = await sendPayslipEmail(match.email, match.file);
