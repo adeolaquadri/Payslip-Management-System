@@ -64,7 +64,7 @@ const UploadPayslip = () => {
       setStatusText("Upload failed.");
       setHasFailure(true);
     }finally{
-      setHasFailure(false);
+      setIsUploading(false);
     }
   };
   return (
