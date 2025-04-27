@@ -7,6 +7,9 @@ import { Container, Card, Form, Button } from "react-bootstrap";
 const UploadPayslip = () => {
   const [pdfFile, setPdfFile] = useState(null);
   const [excelFile, setExcelFile] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [statusText, setStatusText] = useState("Waiting to start...");
+  const [results, setResults] = useState([]);
 
   const handlePdfChange = (e) => setPdfFile(e.target.files[0]);
   const handleExcelChange = (e) => setExcelFile(e.target.files[0]);
@@ -21,19 +24,40 @@ const UploadPayslip = () => {
     formData.append("pdf", pdfFile);
     formData.append("excel", excelFile);
 
+    setStatusText("Uploading files...");
+    setProgress(0);
+
     try {
       const token = localStorage.getItem("token")
       const response = await axios.post("https://api.fcahptibbursaryps.com.ng/upload", formData, 
         {headers: {
           Authorization: `Bearer ${token}`,
-        },});
-        toast.success(response.data.message);
+        },
+      });
+      const data = response.data;
+      const total = data.results.length;
+      let sentCount = 0;
+      setResults(data.results);
+
+      // Now simulate progress
+      for (const r of data.results) {
+        sentCount++;
+        const percentage = Math.round((sentCount / total) * 100);
+        setProgress(percentage);
+        setStatusText(`Sending ${sentCount} of ${total}: ${r.name} (${r.email}) - ${r.status}`);
+
+        // Optional small delay to see progress visually
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      setStatusText("All emails processed!");
     } catch (error) {
-      toast.error("Error uploading files!: ",error.message);
+      console.error(error);
+      setStatusText("Upload failed.");
     }
   };
-
   return (
+    <>
     <Container className="mt-5 d-flex justify-content-center">
       <Card style={{ width: "100%", maxWidth: "600px" }} className="p-4 shadow-sm">
         <Card.Body>
@@ -57,6 +81,40 @@ const UploadPayslip = () => {
       </Card>
       <ToastContainer />
     </Container>
+    <div style={{ marginTop: "20px", width: "100%", backgroundColor: "#eee", borderRadius: "10px" }}>
+        <div
+          style={{
+            width: `${progress}%`,
+            height: "30px",
+            backgroundColor: "#4caf50",
+            color: "white",
+            textAlign: "center",
+            lineHeight: "30px",
+            borderRadius: "10px",
+            transition: "width 0.3s"
+          }}
+        >
+          {progress}%
+        </div>
+      </div>
+
+      <div style={{ marginTop: "10px", fontWeight: "bold" }}>
+        {statusText}
+      </div>
+
+      {results.length > 0 && (
+        <div style={{ marginTop: "20px" }}>
+          <h3>Results:</h3>
+          <ul>
+            {results.map((r, idx) => (
+              <li key={idx}>
+                {r.name} ({r.email}) - {r.status}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
   );
 };
 

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import UploadPayslip from "./UploadPayslip.js";
-import PayslipStatus from "./PayslipStatus.js";
 import { useNavigate } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -76,7 +75,6 @@ const Home = () => {
 
       <div className="container mt-4">
         <UploadPayslip />
-        <PayslipStatus />
         <Footer />
       </div>
     </div>
