@@ -64,7 +64,6 @@ const extractTextFromPDFPages = (pdfPath) => {
 
 // Match payslips by IPPIS Number using pdf2json
 const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
-  // Step 1: Read and Preprocess Excel
   const staffData = xlsx.readFile(excelPath);
   const staffSheet = staffData.Sheets[staffData.SheetNames[0]];
   const staffRecords = xlsx.utils.sheet_to_json(staffSheet);
@@ -77,7 +76,6 @@ const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
     }
   }
 
-  // Step 2: Read PDF and extract text
   const pageTexts = await extractTextFromPDFPages(pdfFilePath);
 
   const pdfBuffer = fs.readFileSync(pdfFilePath);
@@ -87,7 +85,7 @@ const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
   const matchedPayslips = [];
 
   for (let i = 0; i < pageCount; i++) {
-    const cleanedText = pageTexts[i]; // already cleaned
+    const cleanedText = pageTexts[i];
 
     let foundMatch = false;
 
@@ -103,7 +101,7 @@ const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
         const fileName = `${sanitizedName}_${ippisNumber}.pdf`;
         const filePath = path.join("uploads", fileName);
 
-        await saveMatchedPageToPdf(pdfFilePath, i, filePath);
+        await saveMatchedPageToPdf(pdfDoc, i, filePath); // <-- pass pdfDoc
 
         matchedPayslips.push({
           staff_id: ippisNumber,
@@ -113,8 +111,7 @@ const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
         });
 
         foundMatch = true;
-        // staffMap.delete(ippisNumber); // optional if you want
-        break; // Stop checking after finding the match for this page
+        break;
       }
     }
 
@@ -125,6 +122,7 @@ const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
 
   return matchedPayslips;
 };
+
 
 
 
