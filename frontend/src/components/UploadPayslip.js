@@ -9,6 +9,8 @@ const UploadPayslip = () => {
   const [excelFile, setExcelFile] = useState(null);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState("Waiting to start...");
+  const [isUploading, setIsUploading] = useState(false);
+  const [hasFailure, setHasFailure] = useState(false);
   const [results, setResults] = useState([]);
 
   const handlePdfChange = (e) => setPdfFile(e.target.files[0]);
@@ -26,6 +28,8 @@ const UploadPayslip = () => {
 
     setStatusText("Uploading files...");
     setProgress(0);
+    setIsUploading(true);
+    setHasFailure(false);
 
     try {
       const token = localStorage.getItem("token")
@@ -46,6 +50,10 @@ const UploadPayslip = () => {
         setProgress(percentage);
         setStatusText(`Sending ${sentCount} of ${total}: ${r.name} (${r.email}) - ${r.status}`);
 
+        if (r.status !== "Sent") {
+          setHasFailure(true); // Detect failure
+        }
+
         // Optional small delay to see progress visually
         await new Promise(resolve => setTimeout(resolve, 200));
       }
@@ -54,6 +62,9 @@ const UploadPayslip = () => {
     } catch (error) {
       console.error(error);
       setStatusText("Upload failed.");
+      setHasFailure(true);
+    }finally{
+      setHasFailure(false);
     }
   };
   return (
@@ -73,20 +84,33 @@ const UploadPayslip = () => {
               <Form.Control type="file" accept=".xlsx" onChange={handleExcelChange} />
             </Form.Group>
 
-            <Button variant="primary" onClick={handleUpload} className="w-100">
-              Upload
+            <Button variant="primary" disabled={isUploading || !pdfFile || !excelFile} onClick={handleUpload} className="w-100">
+              {isUploading ? "Processing..." : "Upload and Send"}
             </Button>
           </Form>
         </Card.Body>
       </Card>
       <ToastContainer />
     </Container>
+    {isUploading && (
+        <div style={{ marginTop: "10px" }}>
+          <div className="spinner" style={{
+            width: "30px",
+            height: "30px",
+            border: "4px solid #ccc",
+            borderTop: "4px solid #4caf50",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite",
+            margin: "auto"
+          }} />
+        </div>
+      )}
     <div style={{ marginTop: "20px", width: "100%", backgroundColor: "#eee", borderRadius: "10px" }}>
         <div
           style={{
             width: `${progress}%`,
             height: "30px",
-            backgroundColor: "#4caf50",
+            backgroundColor: hasFailure ? "#f44336" : "#4caf50", // Red if failed, Green if success,
             color: "white",
             textAlign: "center",
             lineHeight: "30px",
@@ -114,6 +138,15 @@ const UploadPayslip = () => {
           </ul>
         </div>
       )}
+      {/* Spinner Keyframes */}
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
     </>
   );
 };
