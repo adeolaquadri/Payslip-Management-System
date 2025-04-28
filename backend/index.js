@@ -171,7 +171,7 @@ const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
         console.log(`✅ Matched: ${record.Name} (${record.Email}) on page ${i + 1} ${usedOCR ? "(OCR)" : "(text)"}`);
 
         const name = record.Name || "employee";
-        const sanitizedName = name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+        const sanitizedName = name.replace(/[^a-z0-9]/gi, "_").toUpperCase();
         const fileName = `${sanitizedName}_${ippisNumber}.pdf`;
         const filePath = path.join("uploads", fileName);
 
