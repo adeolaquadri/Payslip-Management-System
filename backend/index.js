@@ -1,14 +1,15 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import multer from "multer";
 import xlsx from "xlsx";
 import path from "path";
 import fs from "fs";
 import fsExtra from "fs-extra";
-import multer from "multer";
 import { PDFDocument } from "pdf-lib";
 import PDFParser from "pdf2json";
-import { fromPath } from "pdf2pic";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.js";
+import { createCanvas } from "canvas";
 import Tesseract from "tesseract.js";
 import { Resend } from "resend";
 import mongoose from "mongoose";
@@ -32,7 +33,6 @@ app.use(cors({
   origin: "https://www.fcahptibbursaryps.com.ng"
 }));
 
-// --- File Upload ---
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
@@ -40,7 +40,9 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
 
-// --- Extract Normal Text Function ---
+// --- Utility Functions ---
+
+// Extract text from PDF normally
 const extractTextFromPDFPages = (pdfPath) => {
   return new Promise((resolve, reject) => {
     const pdfParser = new PDFParser();
@@ -60,7 +62,30 @@ const extractTextFromPDFPages = (pdfPath) => {
   });
 };
 
-// --- Save a Single Page to PDF ---
+// OCR page using PDF.js + canvas
+const ocrPageUsingPDFJS = async (pdfPath, pageIndex) => {
+  const loadingTask = getDocument(pdfPath);
+  const pdf = await loadingTask.promise;
+  const page = await pdf.getPage(pageIndex + 1); // PDF.js pages are 1-based
+
+  const viewport = page.getViewport({ scale: 2.0 });
+  const canvas = createCanvas(viewport.width, viewport.height);
+  const context = canvas.getContext('2d');
+
+  const renderContext = {
+    canvasContext: context,
+    viewport: viewport,
+  };
+
+  await page.render(renderContext).promise;
+
+  const imageBuffer = canvas.toBuffer("image/png");
+
+  const { data: { text } } = await Tesseract.recognize(imageBuffer, "eng");
+  return text.replace(/\s+/g, ' ').trim();
+};
+
+// Save single page to a new PDF
 const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
   const newPdfDoc = await PDFDocument.create();
   const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageIndex]);
@@ -70,7 +95,39 @@ const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
   fs.writeFileSync(outputPath, pdfBytes);
 };
 
-// --- Match Payslips Function (with OCR Fallback) ---
+// Send email with Resend
+const sendPayslipEmail = async (email, filePath) => {
+  try {
+    const content = fs.readFileSync(filePath).toString("base64");
+
+    const { error } = await resend.emails.send({
+      from: "Payslip App <admin@fcahptibbursaryps.com.ng>",
+      to: email,
+      subject: "Your Monthly Payslip",
+      text: "Please find your payslip attached.",
+      attachments: [
+        {
+          filename: path.basename(filePath),
+          content,
+          type: "application/pdf"
+        }
+      ]
+    });
+
+    if (error) {
+      console.error(`Failed to send to ${email}:`, error);
+      return "Failed";
+    }
+
+    console.log(`Successfully sent email to ${email}`);
+    return "Sent";
+  } catch (err) {
+    console.error(`Error sending to ${email}:`, err);
+    return "Failed";
+  }
+};
+
+// --- Main Payslip Matching Function ---
 const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
   const staffData = xlsx.readFile(excelPath);
   const staffSheet = staffData.Sheets[staffData.SheetNames[0]];
@@ -88,20 +145,9 @@ const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
   const pdfDoc = await PDFDocument.load(pdfBuffer);
   const pageCount = pdfDoc.getPageCount();
 
-  const tempImagesDir = "uploads/temp_images";
-  await fsExtra.ensureDir(tempImagesDir);
-
-  const pdf2picConvert = fromPath(pdfFilePath, {
-    density: 300,
-    savePath: tempImagesDir,
-    format: "png",
-    width: 1200,
-    height: 1600,
-  });
+  const pageTexts = await extractTextFromPDFPages(pdfFilePath);
 
   const matchedPayslips = [];
-
-  const pageTexts = await extractTextFromPDFPages(pdfFilePath);
 
   for (let i = 0; i < pageCount; i++) {
     console.log(`Processing page ${i + 1}...`);
@@ -111,10 +157,7 @@ const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
 
     if (!textContent || textContent.length < 30) {
       console.log(`Performing OCR on page ${i + 1}...`);
-      await pdf2picConvert(i + 1);
-      const imagePath = path.join(tempImagesDir, `page.${i + 1}.png`);
-      const { data: { text } } = await Tesseract.recognize(imagePath, "eng");
-      textContent = text.replace(/\s+/g, ' ').trim();
+      textContent = await ocrPageUsingPDFJS(pdfFilePath, i);
       usedOCR = true;
     }
 
@@ -150,47 +193,10 @@ const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
     }
   }
 
-  // Clean up temp images
-  await fsExtra.remove(tempImagesDir);
-
   return matchedPayslips;
 };
 
-// --- Send Email with Resend ---
-const sendPayslipEmail = async (email, filePath) => {
-  try {
-    const content = fs.readFileSync(filePath).toString("base64");
-
-    const { error } = await resend.emails.send({
-      from: "Payslip App <admin@fcahptibbursaryps.com.ng>",
-      to: email,
-      subject: "Your Monthly Payslip",
-      text: "Please find your payslip attached.",
-      attachments: [
-        {
-          filename: path.basename(filePath),
-          content,
-          type: "application/pdf"
-        }
-      ]
-    });
-
-    if (error) {
-      console.error(`Failed to send to ${email}:`, error);
-      return "Failed";
-    }
-
-    console.log(`Successfully sent email to ${email}`);
-    return "Sent";
-  } catch (err) {
-    console.error(`Error sending to ${email}:`, err);
-    return "Failed";
-  }
-};
-
-
-
-// --- Route: Upload ---
+// --- Upload Route ---
 app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (req, res) => {
   const results = [];
   try {
@@ -198,6 +204,7 @@ app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (
     const excelFilePath = req.files.excel[0].path;
 
     const matched = await matchPayslipsByIPPISNumber(pdfFilePath, excelFilePath);
+
     console.log("Matched Staffs:");
     matched.forEach((payslip, index) => {
       console.log(`${index + 1}. Name: ${payslip.name}, IPPIS: ${payslip.staff_id}, Email: ${payslip.email}`);
@@ -207,13 +214,14 @@ app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (
       const status = await sendPayslipEmail(match.email, match.file);
       results.push({ ...match, status });
     }
-     // 🧹 Clean up uploaded files and generated payslips
-     await fsExtra.remove(pdfFilePath);
-     await fsExtra.remove(excelFilePath);
-     for (const match of matched) {
-       await fsExtra.remove(match.file);
-     }
-     console.log("✅ All uploaded and generated files cleaned up.");
+
+    // 🧹 Clean up uploaded and generated files
+    await fsExtra.remove(pdfFilePath);
+    await fsExtra.remove(excelFilePath);
+    for (const match of matched) {
+      await fsExtra.remove(match.file);
+    }
+    console.log("✅ Uploads cleaned.");
 
     res.json({ message: "Payslips processed", results });
   } catch (err) {
