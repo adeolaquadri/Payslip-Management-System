@@ -4,65 +4,73 @@ import cors from "cors";
 import xlsx from "xlsx";
 import path from "path";
 import fs from "fs";
+import fsExtra from "fs-extra";
 import multer from "multer";
 import { PDFDocument } from "pdf-lib";
-import PDFParser from "pdf2json"
+import PDFParser from "pdf2json";
+import { fromPath } from "pdf2pic";
+import Tesseract from "tesseract.js";
 import { Resend } from "resend";
 import mongoose from "mongoose";
 import Admin from "./models/Admin.js";
 import PayslipStatus from "./models/Status.js";
 import { verifyToken } from "./Middlewares/adminAuth.js";
-import bcryptjs from  "bcryptjs"
-import jsonwebtoken from "jsonwebtoken"
-import cookieParser from "cookie-parser"
+import bcryptjs from "bcryptjs";
+import jsonwebtoken from "jsonwebtoken";
+import cookieParser from "cookie-parser";
 
-// Setup
+// --- App Configuration ---
 dotenv.config();
 const app = express();
 const port = process.env.PORT;
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Middleware
 app.use(express.json());
-app.use(cookieParser())
+app.use(cookieParser());
 app.use(cors({
   credentials: true,
   origin: "https://www.fcahptibbursaryps.com.ng"
 }));
 
-// File upload config
-// Multer storage config
+// --- File Upload ---
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
 const upload = multer({ storage });
-
 if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
 
-// Function to extract text from PDF using pdf2json
+// --- Extract Normal Text Function ---
 const extractTextFromPDFPages = (pdfPath) => {
   return new Promise((resolve, reject) => {
     const pdfParser = new PDFParser();
-
     pdfParser.on("pdfParser_dataError", err => reject(err));
     pdfParser.on("pdfParser_dataReady", data => {
       if (data && data.Pages) {
         const pagesTexts = data.Pages.map(page => {
           const text = page.Texts.map(t => decodeURIComponent(t.R[0].T)).join(" ");
-          return text.replace(/\s+/g, ' ').trim(); // clean up text
+          return text.replace(/\s+/g, ' ').trim();
         });
         resolve(pagesTexts);
       } else {
         reject(new Error("No pages found"));
       }
     });
-
     pdfParser.loadPDF(pdfPath);
   });
 };
 
-// Match payslips by IPPIS Number using pdf2json
+// --- Save a Single Page to PDF ---
+const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
+  const newPdfDoc = await PDFDocument.create();
+  const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageIndex]);
+  newPdfDoc.addPage(copiedPage);
+
+  const pdfBytes = await newPdfDoc.save();
+  fs.writeFileSync(outputPath, pdfBytes);
+};
+
+// --- Match Payslips Function (with OCR Fallback) ---
 const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
   const staffData = xlsx.readFile(excelPath);
   const staffSheet = staffData.Sheets[staffData.SheetNames[0]];
@@ -76,38 +84,60 @@ const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
     }
   }
 
-  const pageTexts = await extractTextFromPDFPages(pdfFilePath);
-
   const pdfBuffer = fs.readFileSync(pdfFilePath);
   const pdfDoc = await PDFDocument.load(pdfBuffer);
   const pageCount = pdfDoc.getPageCount();
 
+  const tempImagesDir = "uploads/temp_images";
+  await fsExtra.ensureDir(tempImagesDir);
+
+  const pdf2picConvert = fromPath(pdfFilePath, {
+    density: 300,
+    savePath: tempImagesDir,
+    format: "png",
+    width: 1200,
+    height: 1600,
+  });
+
   const matchedPayslips = [];
 
+  const pageTexts = await extractTextFromPDFPages(pdfFilePath);
+
   for (let i = 0; i < pageCount; i++) {
-    const cleanedText = pageTexts[i];
+    console.log(`Processing page ${i + 1}...`);
+
+    let textContent = pageTexts[i];
+    let usedOCR = false;
+
+    if (!textContent || textContent.length < 30) {
+      console.log(`Performing OCR on page ${i + 1}...`);
+      await pdf2picConvert(i + 1);
+      const imagePath = path.join(tempImagesDir, `page.${i + 1}.png`);
+      const { data: { text } } = await Tesseract.recognize(imagePath, "eng");
+      textContent = text.replace(/\s+/g, ' ').trim();
+      usedOCR = true;
+    }
 
     let foundMatch = false;
 
     for (const [ippisNumber, record] of staffMap.entries()) {
-      const regex = new RegExp(`IPPIS\\s*Number\\s*:\\s*${ippisNumber}`, "i");
+      const regex = new RegExp(`IPPIS\\s*Number\\s*:?\\s*${ippisNumber}`, "i");
 
-      if (regex.test(cleanedText)) {
-        const email = record.Email;
-        if (!email || !email.includes("@")) break;
+      if (regex.test(textContent)) {
+        console.log(`✅ Matched: ${record.Name} (${record.Email}) on page ${i + 1} ${usedOCR ? "(OCR)" : "(text)"}`);
 
         const name = record.Name || "employee";
         const sanitizedName = name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
         const fileName = `${sanitizedName}_${ippisNumber}.pdf`;
         const filePath = path.join("uploads", fileName);
 
-        await saveMatchedPageToPdf(pdfDoc, i, filePath); // <-- pass pdfDoc
+        await saveMatchedPageToPdf(pdfDoc, i, filePath);
 
         matchedPayslips.push({
           staff_id: ippisNumber,
           name,
-          email,
-          file: filePath
+          email: record.Email,
+          file: filePath,
         });
 
         foundMatch = true;
@@ -116,31 +146,17 @@ const matchPayslipsByIPPISNumber = async (pdfFilePath, excelPath) => {
     }
 
     if (!foundMatch) {
-      console.warn(`No matching staff found for page ${i + 1}`);
+      console.warn(`⚠️ No match found for page ${i + 1}`);
     }
   }
+
+  // Clean up temp images
+  await fsExtra.remove(tempImagesDir);
 
   return matchedPayslips;
 };
 
-
-
-
-// Function to save only matched page from the original PDF into a new one
-const saveMatchedPageToPdf = async (pdfFilePath, pageIndex, outputPath) => {
-  const pdfDoc = await PDFDocument.load(fs.readFileSync(pdfFilePath));
-  const newPdfDoc = await PDFDocument.create();
-
-  // Copy the matched page from the original PDF to the new one
-  const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageIndex]);
-  newPdfDoc.addPage(copiedPage);
-
-  // Save the new PDF file with the matched page
-  const pdfBytes = await newPdfDoc.save();
-  fs.writeFileSync(outputPath, pdfBytes);
-};
-
-// Send email with Resend
+// --- Send Email with Resend ---
 const sendPayslipEmail = async (email, filePath) => {
   try {
     const content = fs.readFileSync(filePath).toString("base64");
@@ -173,24 +189,31 @@ const sendPayslipEmail = async (email, filePath) => {
 };
 
 
-// Route to handle uploads
+
+// --- Route: Upload ---
 app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (req, res) => {
-  
-const results = [];
+  const results = [];
   try {
     const pdfFilePath = req.files.pdf[0].path;
     const excelFilePath = req.files.excel[0].path;
 
     const matched = await matchPayslipsByIPPISNumber(pdfFilePath, excelFilePath);
     console.log("Matched Staffs:");
-     matched.forEach((payslip, index) => {
-  console.log(`${index + 1}. Name: ${payslip.name}, IPPIS: ${payslip.staff_id}, Email: ${payslip.email}`);
-});
+    matched.forEach((payslip, index) => {
+      console.log(`${index + 1}. Name: ${payslip.name}, IPPIS: ${payslip.staff_id}, Email: ${payslip.email}`);
+    });
 
     for (const match of matched) {
       const status = await sendPayslipEmail(match.email, match.file);
       results.push({ ...match, status });
     }
+     // 🧹 Clean up uploaded files and generated payslips
+     await fsExtra.remove(pdfFilePath);
+     await fsExtra.remove(excelFilePath);
+     for (const match of matched) {
+       await fsExtra.remove(match.file);
+     }
+     console.log("✅ All uploaded and generated files cleaned up.");
 
     res.json({ message: "Payslips processed", results });
   } catch (err) {
@@ -199,10 +222,6 @@ const results = [];
   }
 });
 
-// Status endpoint
-// app.get("/status", (req, res) => {
-//   res.json(results);
-// });
 
 // Get status history
 app.get("/status/history", verifyToken, async (req, res) => {
