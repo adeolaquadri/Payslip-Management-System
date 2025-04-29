@@ -210,11 +210,33 @@ app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (
     matched.forEach((payslip, index) => {
       console.log(`${index + 1}. Name: ${payslip.name}, IPPIS: ${payslip.staff_id}, Email: ${payslip.email}`);
     });
-
+    
     for (const match of matched) {
-      const status = await sendPayslipEmail(match.email, match.file);
-      results.push({ ...match, status });
-    }
+    const { email, name, file, staff_id } = match;
+
+  // Step 1: Validate email
+  if (!email || !email.includes("@") || email.length < 5) {
+    console.warn(`Invalid email for ${name} (${staff_id}): ${email}`);
+    results.push({ ...match, status: "Invalid Email" });
+    continue;
+  }
+
+  try {
+    // Step 2: Send email
+    const status = await sendPayslipEmail(email, file);
+    console.log(`Email to ${email} - Status: ${status}`);
+    results.push({ ...match, status });
+
+  } catch (err) {
+    // Step 3: Catch unexpected failures
+    console.error(`Unexpected error sending to ${email}:`, err.message);
+    results.push({ ...match, status: "Failed (Exception)" });
+  }
+
+  // Step 4: Wait before next email to prevent rate-limiting
+  await new Promise(res => setTimeout(res, 700)); // 700ms delay
+}
+
 
     // 🧹 Clean up uploaded and generated files
     await fsExtra.remove(pdfFilePath);
