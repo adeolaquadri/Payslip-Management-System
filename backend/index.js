@@ -111,7 +111,7 @@ const sendPayslipEmail = async (email, filePath) => {
     });
 
     const mailOptions = {
-      from: `"Payslip App" <${process.env.SMTP_USER}>`,
+      from: "Payslip App <admin@fcahptibbursaryps.com.ng>",
       to: email,
       subject: "Your Monthly Payslip",
       text: "Please find your payslip attached.",
