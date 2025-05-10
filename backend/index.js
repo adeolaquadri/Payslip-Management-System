@@ -20,6 +20,7 @@ import { verifyToken } from "./Middlewares/adminAuth.js";
 import bcryptjs from "bcryptjs";
 import jsonwebtoken from "jsonwebtoken";
 import cookieParser from "cookie-parser";
+import axios from "axios"
 
 // --- App Configuration ---
 dotenv.config();
@@ -99,31 +100,39 @@ const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
 // Send email with Resend
 const sendPayslipEmail = async (email, filePath) => {
   try {
-    const content = fs.readFileSync(filePath).toString("base64");
+    const base64File = fs.readFileSync(filePath).toString("base64");
 
-    const { error } = await resend.emails.send({
-      from: "Payslip App <admin@fcahptibbursaryps.com.ng>",
-      to: email,
-      subject: "Your Monthly Payslip",
-      text: "Please find your payslip attached.",
-      attachments: [
-        {
-          filename: path.basename(filePath),
-          content,
-          type: "application/pdf"
-        }
-      ]
-    });
+    const response = await axios.post(
+      "https://api.segnivo.com/v1/relay/send", // Replace with actual Segnivo endpoint
+      {
+        to: email,
+        subject: "Your Monthly Payslip",
+        body: "Please find your payslip attached.",
+        attachments: [
+          {
+            filename: path.basename(filePath),
+            content: base64File,
+            type: "application/pdf",
+          },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.SEGNIVO_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-    if (error) {
-      console.error(`Failed to send to ${email}:`, error);
+    if (response.data && response.data.success) {
+      console.log(`✅ Email sent to ${email}`);
+      return "Sent";
+    } else {
+      console.error(`❌ Failed to send to ${email}:`, response.data);
       return "Failed";
     }
-
-    console.log(`Successfully sent email to ${email}`);
-    return "Sent";
   } catch (err) {
-    console.error(`Error sending to ${email}:`, err);
+    console.error(`❌ Error sending to ${email}:`, err.message);
     return "Failed";
   }
 };
