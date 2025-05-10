@@ -20,7 +20,7 @@ import { verifyToken } from "./Middlewares/adminAuth.js";
 import bcryptjs from "bcryptjs";
 import jsonwebtoken from "jsonwebtoken";
 import cookieParser from "cookie-parser";
-import axios from "axios"
+import nodemailer from  "nodemailer"
 
 // --- App Configuration ---
 dotenv.config();
@@ -100,39 +100,35 @@ const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
 // Send email with Resend
 const sendPayslipEmail = async (email, filePath) => {
   try {
-    const base64File = fs.readFileSync(filePath).toString("base64");
-
-    const response = await axios.post(
-      "https://api.segnivo.com/v1/relay/send", // Replace with actual Segnivo endpoint
-      {
-        to: email,
-        subject: "Your Monthly Payslip",
-        body: "Please find your payslip attached.",
-        attachments: [
-          {
-            filename: path.basename(filePath),
-            content: base64File,
-            type: "application/pdf",
-          },
-        ],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.SEGNIVO_API_KEY}`,
-          "Content-Type": "application/json",
-        },
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT),
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
       }
-    );
+    });
 
-    if (response.data && response.data.success) {
-      console.log(`✅ Email sent to ${email}`);
-      return "Sent";
-    } else {
-      console.error(`❌ Failed to send to ${email}:`, response.data);
-      return "Failed";
-    }
-  } catch (err) {
-    console.error(`❌ Error sending to ${email}:`, err.message);
+    const mailOptions = {
+      from: `"Payslip App" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Your Monthly Payslip",
+      text: "Please find your payslip attached.",
+      attachments: [
+        {
+          filename: path.basename(filePath),
+          content: fs.readFileSync(filePath),
+          contentType: "application/pdf"
+        }
+      ]
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ Email sent to ${email}: ${info.messageId}`);
+    return "Sent";
+  } catch (error) {
+    console.error(`❌ Error sending to ${email}:`, error.message);
     return "Failed";
   }
 };
