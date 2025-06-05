@@ -97,7 +97,7 @@ const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
   const pdfBytes = await newPdfDoc.save();
   fs.writeFileSync(outputPath, pdfBytes);
 };
-
+console.log(process.env.SEGNIVO_API_KEY)
 // Send email with Segnivo
 const sendPayslipEmail = async (email, filePath) => {
   try {
@@ -116,6 +116,7 @@ const sendPayslipEmail = async (email, filePath) => {
             disposition: "attachment",
           },
         ],
+        is_transactional: true,
       },
       {
         headers: {
