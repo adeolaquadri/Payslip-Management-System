@@ -12,6 +12,8 @@ const UploadPayslip = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [hasFailure, setHasFailure] = useState(false);
   const [results, setResults] = useState([]);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [timerInterval, setTimerInterval] = useState(null);
 
   const handleUpload = async () => {
     if (!pdfFile || !excelFile) {
@@ -34,6 +36,14 @@ const UploadPayslip = () => {
     setStatusText("Uploading files...");
     setHasFailure(false);
     setResults([]);
+    setElapsedTime(0);
+
+    // Start timer
+    const start = Date.now();
+    const interval = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    setTimerInterval(interval);
 
     try {
       const response = await axios.post("https://api.fcahptibbursaryps.com.ng/upload", formData, {
@@ -57,8 +67,8 @@ const UploadPayslip = () => {
 
       setStatusText("All emails processed.");
       setTimeout(() => {
-  downloadReport();
-}, 300);
+        downloadReport();
+      }, 300);
     } catch (err) {
       console.error(err);
       setStatusText("Upload failed.");
@@ -66,35 +76,35 @@ const UploadPayslip = () => {
       toast.error("An error occurred during upload.");
     } finally {
       setIsUploading(false);
+      if (timerInterval) clearInterval(timerInterval);
     }
   };
 
   const downloadReport = () => {
-  if (results.length === 0) return;
+    if (results.length === 0) return;
 
-  const header = ["Name", "IPPIS Number", "Email", "Status"];
-  const csvRows = [header.join(",")];
+    const header = ["Name", "IPPIS Number", "Email", "Status"];
+    const csvRows = [header.join(",")];
 
-  results.forEach(r => {
-    const row = [
-      `"${r.name}"`,
-      `"${r.staff_id}"`
-      `"${r.email}"`,
-      `"${r.status}"`,
-    ];
-    csvRows.push(row.join(","));
-  });
+    results.forEach((r) => {
+      const row = [
+        `"${r.name}"`,
+        `"${r.staff_id}"`,
+        `"${r.email}"`,
+        `"${r.status}"`,
+      ];
+      csvRows.push(row.join(","));
+    });
 
-  const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "payslip_status_report.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-};
-
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "payslip_status_report.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <Container className="mt-5 d-flex flex-column align-items-center">
@@ -140,6 +150,9 @@ const UploadPayslip = () => {
             striped
           />
           <div className="mt-2 fw-bold text-center">{statusText}</div>
+          <div className="text-center text-muted">
+            Time Elapsed: {Math.floor(elapsedTime / 60)}m {elapsedTime % 60}s
+          </div>
         </div>
       )}
 
@@ -147,11 +160,11 @@ const UploadPayslip = () => {
         <div className="w-100 mt-4" style={{ maxWidth: "600px" }}>
           <h5 className="mb-3">Results:</h5>
           <button onClick={downloadReport} className="btn btn-success mt-3">
-      Download Report
-    </button>
-          <ul className="list-group">
+            Download Report
+          </button>
+          <ul className="list-group mt-3">
             {results.map((r, idx) => (
-              <li key={idx} className={`list-group-item d-flex justify-content-between align-items-center`}>
+              <li key={idx} className="list-group-item d-flex justify-content-between align-items-center">
                 <span>{r.name} ({r.email})</span>
                 <span className={`badge bg-${r.status === "Sent" ? "success" : "danger"}`}>{r.status}</span>
               </li>
