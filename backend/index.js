@@ -99,36 +99,29 @@ const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
 };
 console.log(process.env.SEGNIVO_API_KEY)
 // Send email with Segnivo
-const sendPayslipEmail = async (email, filePath) => {
+const sendPayslipEmail = async (email, fileUrl) => {
   try {
     const response = await axios.post(
       "https://api.segnivo.com/v1/relay/send",
       {
-        recipients: [email],               // must be array called recipients
+        recipients: [email],
         from_name: "Payslip App",
         from_email: "admin@fcahptibbursaryps.com.ng",
         subject: "Your Monthly Payslip",
         content_type: "html",
         content: "<p>Please find your payslip attached.</p>",
-        attachments: [
-          {
-            filename: path.basename(filePath),
-            content: fs.readFileSync(filePath, { encoding: "base64" }),
-            type: "application/pdf",
-            disposition: "attachment",
-          },
-        ],
+        attachments: [fileUrl], // just URL here
         is_transactional: true,
       },
       {
         headers: {
-          "X-API-KEY": process.env.SEGNIVO_API_KEY,   // <-- THIS IS THE CORRECT HEADER
+          "X-API-KEY": process.env.SEGNIVO_API_KEY,
           "Content-Type": "application/json",
         },
       }
     );
 
-    if (response.data?.status === true || response.status === 200) {
+    if (response.data?.status === true) {
       console.log(`✅ Sent to ${email}`);
       return "Sent";
     } else {
