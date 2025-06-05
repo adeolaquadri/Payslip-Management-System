@@ -12,7 +12,6 @@ import pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 const { getDocument } = pdfjsLib;
 import { createCanvas } from "canvas";
 import Tesseract from "tesseract.js";
-import { Resend } from "resend";
 import mongoose from "mongoose";
 import Admin from "./models/Admin.js";
 import PayslipStatus from "./models/Status.js";
@@ -26,7 +25,6 @@ import nodemailer from  "nodemailer"
 dotenv.config();
 const app = express();
 const port = process.env.PORT;
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 app.use(express.json());
 app.use(cookieParser());
@@ -97,7 +95,7 @@ const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
   fs.writeFileSync(outputPath, pdfBytes);
 };
 
-// Send email with Resend
+// Send email with Segnivo
 const sendPayslipEmail = async (email, filePath) => {
   try {
     const transporter = nodemailer.createTransport({
@@ -259,23 +257,6 @@ app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (
 });
 
 
-// Get status history
-app.get("/status/history", verifyToken, async (req, res) => {
-  try {
-      const authHeader = req.headers.authorization;
-      
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-          return res.status(401).json({ message: "Access Denied: No token provided" });
-          }
-    const token = authHeader.split(" ")[1];
-    const verified = jsonwebtoken.verify(token, process.env.secret_key);
-    const history = await PayslipStatus.find().sort({ createdAt: -1 });
-    res.json({history});
-  } catch (err) {
-    console.error("Error fetching status history:", err);
-    res.status(500).json({ message: "Internal server error." });
-  }
-})
 
 //Admin Signup
 app.post('/signup', async(req, res)=>{
@@ -350,19 +331,6 @@ app.put('/reset_password', async(req, res)=>{
 
   }catch(e){
     return res.status(500).json({ message: e.message})
-  }
-})
-
-// delete admin
-app.delete('/admin', verifyToken, async(req, res)=>{
-  try{
-    const admin = await Admin.deleteOne()
-    if(!admin){res.status(404).json({message: "Admin not found"})
-    }else{
-  return res.status(200).json({message: "Admin deleted successfully"})
-}
-  }catch(e){
-    return res.status(500).json({'Error ': e.message})
   }
 })
 
