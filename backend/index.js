@@ -125,10 +125,10 @@ const sendPayslipEmail = async (email, filePath) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log(✅ Email sent to ${email}: ${info.messageId});
+    console.log(`✅Email sent to ${email}: ${info.messageId}`);
     return "Sent";
   } catch (error) {
-    console.error(❌ Error sending to ${email}:, error.message);
+    console.error(`❌Error sending to ${email}:`, error.message);
     return "Failed";
   }
 };
