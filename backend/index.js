@@ -99,10 +99,6 @@ const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
 };
 
 // Send email with Segnivo
-import axios from "axios";
-import fs from "fs";
-import path from "path";
-
 const sendPayslipEmail = async (email, filePath) => {
   try {
     const response = await axios.post(
