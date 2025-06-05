@@ -21,7 +21,7 @@ import jsonwebtoken from "jsonwebtoken";
 import cookieParser from "cookie-parser";
 import nodemailer from  "nodemailer"
 import validator from "validator";
-import axios from "axios
+import axios from "axios"
 
 
 // --- App Configuration ---
