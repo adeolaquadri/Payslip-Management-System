@@ -56,6 +56,7 @@ const UploadPayslip = () => {
       }
 
       setStatusText("All emails processed.");
+      downloadReport();
     } catch (err) {
       console.error(err);
       setStatusText("Upload failed.");
@@ -143,9 +144,6 @@ const UploadPayslip = () => {
       {results.length > 0 && (
         <div className="w-100 mt-4" style={{ maxWidth: "600px" }}>
           <h5 className="mb-3">Results:</h5>
-          <Button variant="secondary" onClick={downloadReport} className="mb-3">
-  Download Report (CSV)
-</Button>
 
           <ul className="list-group">
             {results.map((r, idx) => (
