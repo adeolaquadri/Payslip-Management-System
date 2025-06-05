@@ -104,10 +104,12 @@ const sendPayslipEmail = async (email, filePath) => {
     const response = await axios.post(
       "https://api.segnivo.com/v1/relay/send",
       {
-        to: email,
-        from: "Payslip App <admin@fcahptibbursaryps.com.ng>",
+        recipients: [email],               // must be array called recipients
+        from_name: "Payslip App",
+        from_email: "admin@fcahptibbursaryps.com.ng",
         subject: "Your Monthly Payslip",
-        html: "<p>Please find your payslip attached.</p>",
+        content_type: "html",
+        content: "<p>Please find your payslip attached.</p>",
         attachments: [
           {
             filename: path.basename(filePath),
@@ -120,17 +122,17 @@ const sendPayslipEmail = async (email, filePath) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.SEGNIVO_API_KEY}`,
+          "X-API-KEY": process.env.SEGNIVO_API_KEY,   // <-- THIS IS THE CORRECT HEADER
           "Content-Type": "application/json",
         },
       }
     );
 
-    if (response.data?.success || response.status === 200) {
+    if (response.data?.status === true || response.status === 200) {
       console.log(`✅ Sent to ${email}`);
       return "Sent";
     } else {
-      console.warn(`⚠️ Failed to send to ${email}`);
+      console.warn(`⚠️ Failed to send to ${email}`, response.data);
       return "Failed";
     }
   } catch (err) {
