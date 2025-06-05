@@ -20,6 +20,9 @@ import bcryptjs from "bcryptjs";
 import jsonwebtoken from "jsonwebtoken";
 import cookieParser from "cookie-parser";
 import nodemailer from  "nodemailer"
+import validator from "validator";
+
+
 
 // --- App Configuration ---
 dotenv.config();
@@ -218,11 +221,11 @@ app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (
     const { email, name, file, staff_id } = match;
 
   // Step 1: Validate email
-  if (!email || !email.includes("@") || email.length < 5) {
-    console.warn(`Invalid email for ${name} (${staff_id}): ${email}`);
-    results.push({ ...match, status: "Invalid Email" });
-    continue;
-  }
+    if (!validator.isEmail(email)) {
+       console.warn(`Invalid email for ${name} (${staff_id}): ${email}`);
+       results.push({ ...match, status: "Invalid Email" });
+       continue;
+     }
 
   try {
     // Step 2: Send email
