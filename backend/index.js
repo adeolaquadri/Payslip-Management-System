@@ -98,35 +98,37 @@ const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
 };
 
 // Send email with Segnivo
-const smtpTransporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,                   
-  secure: false,                
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
-
 const sendPayslipEmail = async (email, filePath) => {
   try {
-    const info = await smtpTransporter.sendMail({
-      from: '"Payslip App" <admin@fcahptibbursaryps.com.ng>',
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT),
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    const mailOptions = {
+      from: "Payslip App <admin@fcahptibbursaryps.com.ng>",
       to: email,
       subject: "Your Monthly Payslip",
-      html: "<p>Please find your payslip attached.</p>",
+      text: "Please find your payslip attached.",
       attachments: [
         {
           filename: path.basename(filePath),
-          path: filePath,
-        },
-      ],
-    });
+          content: fs.readFileSync(filePath),
+          contentType: "application/pdf"
+        }
+      ]
+    };
 
-    console.log(`✅ Sent to ${email} (${info.messageId})`);
+    const info = await transporter.sendMail(mailOptions);
+    console.log(✅ Email sent to ${email}: ${info.messageId});
     return "Sent";
-  } catch (err) {
-    console.error(`❌ Failed to send to ${email}:`, err.message);
+  } catch (error) {
+    console.error(❌ Error sending to ${email}:, error.message);
     return "Failed";
   }
 };
