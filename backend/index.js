@@ -21,7 +21,6 @@ import jsonwebtoken from "jsonwebtoken";
 import cookieParser from "cookie-parser";
 import nodemailer from  "nodemailer"
 import validator from "validator";
-import axios from "axios"
 
 
 // --- App Configuration ---
@@ -97,42 +96,41 @@ const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
   const pdfBytes = await newPdfDoc.save();
   fs.writeFileSync(outputPath, pdfBytes);
 };
-console.log(process.env.SEGNIVO_API_KEY)
-// Send email with Segnivo
-const sendPayslipEmail = async (email, fileUrl) => {
-  try {
-    const response = await axios.post(
-      "https://api.segnivo.com/v1/relay/send",
-      {
-        recipients: [email],
-        from_name: "Payslip App",
-        from_email: "admin@fcahptibbursaryps.com.ng",
-        subject: "Your Monthly Payslip",
-        content_type: "html",
-        content: "<p>Please find your payslip attached.</p>",
-        attachments: [fileUrl], // just URL here
-        is_transactional: true,
-      },
-      {
-        headers: {
-          "X-API-KEY": process.env.SEGNIVO_API_KEY,
-          "Content-Type": "application/json",
-        },
-      }
-    );
 
-    if (response.data?.status === true) {
-      console.log(`✅ Sent to ${email}`);
-      return "Sent";
-    } else {
-      console.warn(`⚠️ Failed to send to ${email}`, response.data);
-      return "Failed";
-    }
+// Send email with Segnivo
+const smtpTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,                   
+  secure: false,                
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASSWORD,
+  },
+});
+
+const sendPayslipEmail = async (email, filePath) => {
+  try {
+    const info = await smtpTransporter.sendMail({
+      from: '"Payslip App" <admin@fcahptibbursaryps.com.ng>',
+      to: email,
+      subject: "Your Monthly Payslip",
+      html: "<p>Please find your payslip attached.</p>",
+      attachments: [
+        {
+          filename: path.basename(filePath),
+          path: filePath,
+        },
+      ],
+    });
+
+    console.log(`✅ Sent to ${email} (${info.messageId})`);
+    return "Sent";
   } catch (err) {
-    console.error(`❌ Error sending to ${email}:`, err.response?.data || err.message);
+    console.error(`❌ Failed to send to ${email}:`, err.message);
     return "Failed";
   }
 };
+
 
 
 // --- Main Payslip Matching Function ---
