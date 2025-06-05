@@ -56,7 +56,9 @@ const UploadPayslip = () => {
       }
 
       setStatusText("All emails processed.");
-      downloadReport();
+      setTimeout(() => {
+  downloadReport();
+}, 300);
     } catch (err) {
       console.error(err);
       setStatusText("Upload failed.");
@@ -144,7 +146,9 @@ const UploadPayslip = () => {
       {results.length > 0 && (
         <div className="w-100 mt-4" style={{ maxWidth: "600px" }}>
           <h5 className="mb-3">Results:</h5>
-
+          <button onClick={downloadReport} className="btn btn-success mt-3">
+      Download Report
+    </button>
           <ul className="list-group">
             {results.map((r, idx) => (
               <li key={idx} className={`list-group-item d-flex justify-content-between align-items-center`}>
