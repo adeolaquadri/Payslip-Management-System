@@ -112,11 +112,19 @@ const validateEmailWithAbstract = async (email) => {
       result.is_role_email?.value === false
     );
   } catch (error) {
-    console.error("Abstract validation error:", error.message);
-    return false; 
+    // Silently skip on API errors or quota issues
+    if (
+      error.response?.status === 401 || // Unauthorized or quota exceeded
+      error.response?.status === 402 || // Payment required
+      error.code === "ENOTFOUND" ||     // Network issues
+      error.code === "ECONNABORTED"     // Timeout or connection aborted
+    ) {
+      console.warn("Abstract API skipped due to error/quota.");
+      return false;
+    }
+    return false;
   }
 };
-
 // Send email with Segnivo
 const sendPayslipEmail = async (email, filePath) => {
     const isValid = await validateEmailWithAbstract(email);
