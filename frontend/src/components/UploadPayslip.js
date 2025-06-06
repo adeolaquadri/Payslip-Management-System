@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -13,10 +13,15 @@ const UploadPayslip = () => {
   const [hasFailure, setHasFailure] = useState(false);
   const [results, setResults] = useState([]);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [countdown, setCountdown] = useState(0);
+  const [estimate, setEstimate] = useState(null);
 
-  const elapsedRef = useRef(null);
-  const countdownRef = useRef(null);
+  useEffect(() => {
+    // Load last estimated processing time info from localStorage
+    const storedEstimate = localStorage.getItem("estimatedProcessingTime");
+    if (storedEstimate) {
+      setEstimate(JSON.parse(storedEstimate));
+    }
+  }, []);
 
   const handleUpload = async () => {
     if (!pdfFile || !excelFile) {
@@ -40,8 +45,13 @@ const UploadPayslip = () => {
     setHasFailure(false);
     setResults([]);
     setElapsedTime(0);
-    setCountdown(0);
+
     const startTime = Date.now();
+
+    // Start elapsed timer immediately
+    const elapsedInterval = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
 
     try {
       const response = await axios.post("https://api.fcahptibbursaryps.com.ng/upload", formData, {
@@ -51,25 +61,6 @@ const UploadPayslip = () => {
       const data = response.data;
       const total = data.results.length;
       setResults(data.results);
-
-      const estimatedTime = total * 2;
-      setCountdown(estimatedTime);
-
-      // Start timers
-      const start = Date.now();
-      elapsedRef.current = setInterval(() => {
-        setElapsedTime(Math.floor((Date.now() - start) / 1000));
-      }, 1000);
-
-      countdownRef.current = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(countdownRef.current);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
 
       let sentCount = 0;
       for (const r of data.results) {
@@ -82,13 +73,27 @@ const UploadPayslip = () => {
         await new Promise((res) => setTimeout(res, 200)); // Visual feedback
       }
 
-     const totalTimeInSeconds = Math.floor((Date.now() - startTime) / 1000);
-     console.log(`Total processing time: ${totalTimeInSeconds} seconds`);
-     setStatusText(`All emails processed in ${Math.floor(totalTimeInSeconds / 60)}m ${totalTimeInSeconds % 60}s.`);
+      const totalTimeInSeconds = Math.floor((Date.now() - startTime) / 1000);
+      const averagePerEmail = total > 0 ? totalTimeInSeconds / total : 0;
 
-      setTimeout(() => {
-        downloadReport();
-      }, 300);
+      // Save estimate for future use
+      localStorage.setItem(
+        "estimatedProcessingTime",
+        JSON.stringify({
+          averagePerEmail,
+          lastTotalEmails: total,
+          lastTotalTime: totalTimeInSeconds,
+          timestamp: Date.now(),
+        })
+      );
+
+      setEstimate({
+        averagePerEmail,
+        lastTotalEmails: total,
+        lastTotalTime: totalTimeInSeconds,
+      });
+
+      setStatusText(`All emails processed in ${Math.floor(totalTimeInSeconds / 60)}m ${totalTimeInSeconds % 60}s.`);
     } catch (err) {
       console.error(err);
       setStatusText("Upload failed.");
@@ -96,8 +101,7 @@ const UploadPayslip = () => {
       toast.error("An error occurred during upload.");
     } finally {
       setIsUploading(false);
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-      if (countdownRef.current) clearInterval(countdownRef.current);
+      clearInterval(elapsedInterval);
     }
   };
 
@@ -124,6 +128,13 @@ const UploadPayslip = () => {
 
   return (
     <Container className="mt-5 d-flex flex-column align-items-center">
+      {estimate && (
+        <div className="mb-3 text-center text-muted" style={{ maxWidth: "600px", width: "100%" }}>
+          Estimated processing time per email: {estimate.averagePerEmail.toFixed(2)}s <br />
+          Last batch: {estimate.lastTotalEmails} emails in {Math.floor(estimate.lastTotalTime / 60)}m {estimate.lastTotalTime % 60}s
+        </div>
+      )}
+
       <Card style={{ maxWidth: "600px", width: "100%" }} className="p-4 shadow-sm">
         <Card.Body>
           <h3 className="mb-4 text-center">Upload Payslip PDF & Excel</h3>
@@ -165,13 +176,11 @@ const UploadPayslip = () => {
             animated
             striped
           />
-          <div className="mt-2 fw-bold text-center bg-success text-white p-2 rounded">
+          <div className="mt-2 fw-bold text-center" style={{ backgroundColor: "#d4edda", padding: "8px", borderRadius: "4px" }}>
             {statusText}
           </div>
           <div className="text-center text-muted">
-            Elapsed: {Math.floor(elapsedTime / 60)}m {elapsedTime % 60}s
-            <br />
-            Remaining: {Math.floor(countdown / 60)}m {countdown % 60}s
+            Time Elapsed: {Math.floor(elapsedTime / 60)}m {elapsedTime % 60}s
           </div>
         </div>
       )}
@@ -184,9 +193,11 @@ const UploadPayslip = () => {
           </button>
           <ul className="list-group mt-3">
             {results.map((r, idx) => (
-              <li key={idx} className="list-group-item d-flex justify-content-between align-items-center">
-                <span>{r.name} ({r.email})</span>
-                <span className="badge bg-success text-white">{r.status}</span>
+              <li key={idx} className="list-group-item d-flex justify-content-between align-items-center" style={{ backgroundColor: "#d4edda" }}>
+                <span>
+                  {r.name} ({r.email})
+                </span>
+                <span className={`badge bg-${r.status === "Sent" ? "success" : "danger"}`}>{r.status}</span>
               </li>
             ))}
           </ul>
