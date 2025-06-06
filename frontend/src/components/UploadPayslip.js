@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -13,7 +13,10 @@ const UploadPayslip = () => {
   const [hasFailure, setHasFailure] = useState(false);
   const [results, setResults] = useState([]);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [timerInterval, setTimerInterval] = useState(null);
+  const [countdown, setCountdown] = useState(0);
+
+  const elapsedRef = useRef(null);
+  const countdownRef = useRef(null);
 
   const handleUpload = async () => {
     if (!pdfFile || !excelFile) {
@@ -37,13 +40,8 @@ const UploadPayslip = () => {
     setHasFailure(false);
     setResults([]);
     setElapsedTime(0);
-
-    // Start timer
-    const start = Date.now();
-    const interval = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - start) / 1000));
-    }, 1000);
-    setTimerInterval(interval);
+    setCountdown(0);
+    const startTime = Date.now();
 
     try {
       const response = await axios.post("https://api.fcahptibbursaryps.com.ng/upload", formData, {
@@ -52,9 +50,28 @@ const UploadPayslip = () => {
 
       const data = response.data;
       const total = data.results.length;
-      let sentCount = 0;
       setResults(data.results);
 
+      const estimatedTime = total * 2;
+      setCountdown(estimatedTime);
+
+      // Start timers
+      const start = Date.now();
+      elapsedRef.current = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - start) / 1000));
+      }, 1000);
+
+      countdownRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      let sentCount = 0;
       for (const r of data.results) {
         sentCount++;
         const percent = Math.round((sentCount / total) * 100);
@@ -65,7 +82,10 @@ const UploadPayslip = () => {
         await new Promise((res) => setTimeout(res, 200)); // Visual feedback
       }
 
-      setStatusText("All emails processed.");
+     const totalTimeInSeconds = Math.floor((Date.now() - startTime) / 1000);
+     console.log(`Total processing time: ${totalTimeInSeconds} seconds`);
+     setStatusText(`All emails processed in ${Math.floor(totalTimeInSeconds / 60)}m ${totalTimeInSeconds % 60}s.`);
+
       setTimeout(() => {
         downloadReport();
       }, 300);
@@ -76,7 +96,8 @@ const UploadPayslip = () => {
       toast.error("An error occurred during upload.");
     } finally {
       setIsUploading(false);
-      if (timerInterval) clearInterval(timerInterval);
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
     }
   };
 
@@ -87,12 +108,7 @@ const UploadPayslip = () => {
     const csvRows = [header.join(",")];
 
     results.forEach((r) => {
-      const row = [
-        `"${r.name}"`,
-        `"${r.staff_id}"`,
-        `"${r.email}"`,
-        `"${r.status}"`,
-      ];
+      const row = [`"${r.name}"`, `"${r.staff_id}"`, `"${r.email}"`, `"${r.status}"`];
       csvRows.push(row.join(","));
     });
 
@@ -149,9 +165,13 @@ const UploadPayslip = () => {
             animated
             striped
           />
-          <div className="mt-2 fw-bold text-center">{statusText}</div>
+          <div className="mt-2 fw-bold text-center bg-success text-white p-2 rounded">
+            {statusText}
+          </div>
           <div className="text-center text-muted">
-            Time Elapsed: {Math.floor(elapsedTime / 60)}m {elapsedTime % 60}s
+            Elapsed: {Math.floor(elapsedTime / 60)}m {elapsedTime % 60}s
+            <br />
+            Remaining: {Math.floor(countdown / 60)}m {countdown % 60}s
           </div>
         </div>
       )}
@@ -166,7 +186,7 @@ const UploadPayslip = () => {
             {results.map((r, idx) => (
               <li key={idx} className="list-group-item d-flex justify-content-between align-items-center">
                 <span>{r.name} ({r.email})</span>
-                <span className={`badge bg-${r.status === "Sent" ? "success" : "danger"}`}>{r.status}</span>
+                <span className="badge bg-success text-white">{r.status}</span>
               </li>
             ))}
           </ul>
