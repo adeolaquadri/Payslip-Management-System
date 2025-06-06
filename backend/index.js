@@ -247,11 +247,11 @@ app.post("/upload", upload.fields([{ name: "pdf" }, { name: "excel" }]), async (
     const { email, name, file, staff_id } = match;
 
   // Step 1: Validate email
-    if (!validator.isEmail(email)) {
-       console.warn(`Invalid email for ${name} (${staff_id}): ${email}`);
-       results.push({ ...match, status: "Invalid Email" });
-       continue;
-     }
+  if (!email || !email.includes("@") || email.length < 5) {
+        console.warn(`Invalid email for ${name} (${staff_id}): ${email}`);
+        results.push({ ...match, status: "Invalid Email" });
+        continue;
+       }
 
   try {
     // Step 2: Send email
