@@ -14,13 +14,13 @@ import { createCanvas } from "canvas";
 import Tesseract from "tesseract.js";
 import mongoose from "mongoose";
 import Admin from "./models/Admin.js";
-import PayslipStatus from "./models/Status.js";
 import { verifyToken } from "./Middlewares/adminAuth.js";
 import bcryptjs from "bcryptjs";
 import jsonwebtoken from "jsonwebtoken";
 import cookieParser from "cookie-parser";
 import nodemailer from  "nodemailer"
 import validator from "validator";
+import axios from "axios";
 
 
 // --- App Configuration ---
@@ -97,8 +97,33 @@ const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
   fs.writeFileSync(outputPath, pdfBytes);
 };
 
+const validateEmailWithAbstract = async (email) => {
+  try {
+    const apiKey = process.env.ABSTRACT_API_KEY;
+    const url = `https://emailvalidation.abstractapi.com/v1/?api_key=${apiKey}&email=${email}`;
+
+    const response = await axios.get(url);
+    const result = response.data;
+
+    return (
+      result.deliverability === "DELIVERABLE" &&
+      result.is_valid_format?.value === true &&
+      result.is_disposable_email?.value === false &&
+      result.is_role_email?.value === false
+    );
+  } catch (error) {
+    console.error("Abstract validation error:", error.message);
+    return false; 
+  }
+};
+
 // Send email with Segnivo
 const sendPayslipEmail = async (email, filePath) => {
+    const isValid = await validateEmailWithAbstract(email);
+    if (!isValid) {
+    console.warn(`❌ Skipping invalid email: ${email}`);
+    return "Invalid Email";
+   }
   try {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
