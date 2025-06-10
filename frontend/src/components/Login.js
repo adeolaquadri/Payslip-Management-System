@@ -9,10 +9,12 @@ import { useNavigate } from 'react-router-dom';
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const submitForm = async (event) => {
     event.preventDefault();
+    setLoading(true);
     try {
       const response = await axios.post("https://api.fcahptibbursaryps.com.ng/login", {
         email,
@@ -27,7 +29,9 @@ const Login = () => {
     } catch (error) {
       console.error("Login failed:", error.response?.data?.error || error.message);
       toast.error(error.response?.data?.message || "Login failed");
-    }
+    }finally{
+      setLoading(false);
+      }
   };
 
   return (
@@ -63,9 +67,9 @@ const Login = () => {
                     />
                   </Form.Group>
 
-                  <Button variant="primary" type="submit" className="w-100">
-                    Sign in
-                  </Button>
+                  <Button variant="primary" type="submit" className="w-100" disabled={loading}>
+  {loading ? "Signing in..." : "Sign in"}
+</Button>
                 </Form>
 
                 <ToastContainer />
