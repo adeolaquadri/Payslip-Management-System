@@ -97,41 +97,8 @@ const saveMatchedPageToPdf = async (pdfDoc, pageIndex, outputPath) => {
   fs.writeFileSync(outputPath, pdfBytes);
 };
 
-const validateEmailWithAbstract = async (email) => {
-  try {
-    const apiKey = process.env.ABSTRACT_API_KEY;
-    const url = `https://emailvalidation.abstractapi.com/v1/?api_key=${apiKey}&email=${email}`;
-
-    const response = await axios.get(url);
-    const result = response.data;
-
-    return (
-      result.deliverability === "DELIVERABLE" &&
-      result.is_valid_format?.value === true &&
-      result.is_disposable_email?.value === false &&
-      result.is_role_email?.value === false
-    );
-  } catch (error) {
-    // Silently skip on API errors or quota issues
-    if (
-      error.response?.status === 401 || // Unauthorized or quota exceeded
-      error.response?.status === 402 || // Payment required
-      error.code === "ENOTFOUND" ||     // Network issues
-      error.code === "ECONNABORTED"     // Timeout or connection aborted
-    ) {
-      console.warn("Abstract API skipped due to error/quota.");
-      return false;
-    }
-    return false;
-  }
-};
 // Send email with Segnivo
 const sendPayslipEmail = async (email, filePath) => {
-    const isValid = await validateEmailWithAbstract(email);
-    if (!isValid) {
-    console.warn(`❌ Skipping invalid email: ${email}`);
-    return "Invalid Email";
-   }
   try {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
