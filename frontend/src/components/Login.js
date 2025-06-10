@@ -5,6 +5,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Footer from './Footer';
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -33,6 +34,13 @@ const Login = () => {
       setLoading(false);
       }
   };
+
+useEffect(() => {
+  if (localStorage.getItem("token")) {
+    navigate('/');
+  }
+}, []);
+
 
   return (
     <>
