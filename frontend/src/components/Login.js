@@ -35,13 +35,6 @@ const Login = () => {
       }
   };
 
-useEffect(() => {
-  if (localStorage.getItem("token")) {
-    navigate('/');
-  }
-}, []);
-
-
   return (
     <>
       <Container className="d-flex justify-content-center align-items-center min-vh-100">
