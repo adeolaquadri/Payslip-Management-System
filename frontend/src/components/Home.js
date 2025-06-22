@@ -1,57 +1,24 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
-import UploadPayslip from "./UploadPayslip.js";
+import UploadPayslip from "./UploadPayslip";
 import { useNavigate } from "react-router-dom";
-import { ToastContainer, toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import Footer from "./Footer.js";
-import axios from  "axios"
+import Footer from "./Footer";
+import useAuthCheck from "../hooks/useAuthCheck";
 
 const Home = () => {
   const navigate = useNavigate();
-  const [checked, setChecked] = useState(false);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-          toast.error("Session expired. Please log in.");
-          return navigate("/login");
-        }
-
-      const response = await axios.get("https://api.fcahptibbursaryps.com.ng/auth", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!response) {
-          toast.error("Unauthorized. Redirecting to login.");
-          return navigate("/login");
-        }
-        if (response.data.authenticated) {
-          setChecked(true);
-        } else {
-          navigate("/login");
-        }
-      } catch (error) {
-        console.error("Auth check failed:", error);
-        navigate("/login");
-      }
-    };
-
-    checkAuth();
-  }, [navigate]);
+  const { loading, authenticated } = useAuthCheck();
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    toast.success("Logging out...");
     navigate("/login");
   };
 
-  if (!checked) return <p className="text-center mt-5">Checking authentication...</p>;
+  if (loading) return <p className="text-center mt-5">Checking authentication...</p>;
+  if (!authenticated) return null; // or redirect fallback
 
   return (
     <div>
@@ -59,17 +26,9 @@ const Home = () => {
       <nav className="navbar navbar-dark bg-primary">
         <div className="container">
           <span className="navbar-brand">Payslip Management System</span>
-          <div>
-            {/* <button
-              className="btn btn-outline-light me-2"
-              onClick={() => navigate("/status/history")}
-            >
-              History
-            </button> */}
-            <button className="btn btn-outline-light" onClick={handleLogout}>
-              Logout
-            </button>
-          </div>
+          <button className="btn btn-outline-light" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </nav>
 

@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Form, Button, Container, Row, Col, Card } from 'react-bootstrap';
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Footer from './Footer';
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -13,9 +12,24 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Redirect if already logged in
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      navigate("/");
+    }
+  }, [navigate]);
+
+  // Clear stale tokens on first load
+  useEffect(() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+  }, []);
+
   const submitForm = async (event) => {
     event.preventDefault();
     setLoading(true);
+
     try {
       const response = await axios.post("https://api.fcahptibbursaryps.com.ng/login", {
         email,
@@ -23,16 +37,22 @@ const Login = () => {
       });
 
       if (response.data.token) {
-        // Store token and user info
         localStorage.setItem("token", response.data.token);
         navigate('/');
+      } else {
+        toast.error("Unexpected response. Please try again.");
       }
+
     } catch (error) {
-      console.error("Login failed:", error.response?.data?.error || error.message);
-      toast.error(error.response?.data?.message || "Login failed");
-    }finally{
+      console.error("Login failed:", error);
+      toast.error(
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Login failed. Please try again."
+      );
+    } finally {
       setLoading(false);
-      }
+    }
   };
 
   return (
@@ -69,8 +89,8 @@ const Login = () => {
                   </Form.Group>
 
                   <Button variant="primary" type="submit" className="w-100" disabled={loading}>
-  {loading ? "Signing in..." : "Sign in"}
-</Button>
+                    {loading ? "Signing in..." : "Sign in"}
+                  </Button>
                 </Form>
 
                 <ToastContainer />
@@ -86,6 +106,7 @@ const Login = () => {
           </Col>
         </Row>
       </Container>
+
       <Footer />
     </>
   );
