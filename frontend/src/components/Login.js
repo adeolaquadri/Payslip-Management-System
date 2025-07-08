@@ -4,13 +4,16 @@ import { Form, Button, Container, Row, Col, Card } from 'react-bootstrap';
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Footer from './Footer';
+import { useLocation } from "react-router-dom";
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from "../contexts/AuthContext";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   // Redirect if already logged in
   useEffect(() => {
@@ -20,24 +23,33 @@ const Login = () => {
     }
   }, [navigate]);
 
-  // Clear stale tokens on first load
-  useEffect(() => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-  }, []);
+  const location = useLocation();
+
+useEffect(() => {
+  if (location.state?.message) {
+    toast.info(location.state.message);
+  }
+
+  // if using query param fallback:
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("expired")) {
+    toast.info("Session expired. Please login again.");
+  }
+}, [location.state]);
+
 
   const submitForm = async (event) => {
     event.preventDefault();
     setLoading(true);
 
     try {
-      const response = await axios.post("https://api.fcahptibbursaryps.com.ng/login", {
+      const response = await axios.post("/login", {
         email,
         password,
       });
 
       if (response.data.token) {
-        localStorage.setItem("token", response.data.token);
+        login(response.data.user, response.data.token);
         navigate('/');
       } else {
         toast.error("Unexpected response. Please try again.");

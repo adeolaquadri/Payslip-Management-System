@@ -54,7 +54,7 @@ const UploadPayslip = () => {
     }, 1000);
 
     try {
-      const response = await axios.post("https://api.fcahptibbursaryps.com.ng/upload", formData, {
+      const response = await axios.post("/upload", formData, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

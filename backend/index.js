@@ -18,9 +18,9 @@ import { verifyToken } from "./Middlewares/adminAuth.js";
 import bcryptjs from "bcryptjs";
 import jsonwebtoken from "jsonwebtoken";
 import cookieParser from "cookie-parser";
-import nodemailer from  "nodemailer"
-import validator from "validator";
-import axios from "axios";
+import nodemailer from  "nodemailer";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
 
 // --- App Configuration ---
@@ -30,9 +30,14 @@ const port = process.env.PORT;
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(helmet());
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+}));
 app.use(cors({
   credentials: true,
-  origin: "https://www.fcahptibbursaryps.com.ng"
+  origin: "http://localhost:3000"
 }));
 
 const storage = multer.diskStorage({
@@ -297,12 +302,14 @@ app.post('/login', async(req, res)=>{
       return res.status(401).json({ message: "Unauthorized Access!" });
     }
 
-    // Generate JWT token (you can also use sessions instead)
     const token = jsonwebtoken.sign(
       { adminId: admin._id, email: admin.email },
-      process.env.secret_key, {
-        expiresIn: "1h",
+      process.env.JWT_SECRET_KEY, {
+        expiresIn: "5h",
       });
+      console.log("JWT Secret on login:", process.env.JWT_SECRET_KEY);
+      console.log("Generated Token:", token);
+
       return res.status(200).json({message: "Login Successful!", token, user: admin})
   } catch (error) {
     console.error("Login Error:", error);
@@ -350,12 +357,34 @@ app.get("/auth", (req, res) => {
     const token = authHeader.split(" ")[1];
     const verified = jsonwebtoken.verify(token, process.env.secret_key);
 
-    // You can send the user data back if needed
     return res.status(200).json({ authenticated: true, user: verified });
 
   } catch (error) {
     return res.status(403).json({ message: "Invalid or expired token", error: error.message });
   }
+});
+
+app.get("/auth/verify", (req, res) => {
+    const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jsonwebtoken.verify(token, process.env.JWT_SECRET_KEY);
+    return res.status(200).json({ user: decoded });
+  } catch (err) {
+    console.error("JWT verify failed:", err.message);
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
+});
+
+
+app.get("/api/health", (req, res) => {
+  res.json({ ok: true });
 });
 
 

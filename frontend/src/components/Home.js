@@ -5,20 +5,14 @@ import { useNavigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Footer from "./Footer";
-import useAuthCheck from "../hooks/useAuthCheck";
 
 const Home = () => {
   const navigate = useNavigate();
-  const { loading, authenticated } = useAuthCheck();
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    localStorage.clear();
     navigate("/login");
   };
-
-  if (loading) return <p className="text-center mt-5">Checking authentication...</p>;
-  if (!authenticated) return null; // or redirect fallback
 
   return (
     <div>

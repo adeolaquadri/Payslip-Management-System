@@ -1,16 +1,14 @@
-import { useAuth } from "./context/AuthContext";
+import { useEffect } from "react";
+import { useAuth } from "./contexts/AuthContext";
 
 const Logout = () => {
-  const { setLoggedIn } = useAuth();
+  const { logout } = useAuth(); 
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setLoggedIn(false)
-    window.localStorage.href = '/login';
-  };
-  handleLogout();
-  return null; // You can show a spinner or "Logging out..." message here if you like
+  useEffect(() => {
+    logout();
+  }, [logout]);
+
+  return null;
 };
 
 export default Logout;
