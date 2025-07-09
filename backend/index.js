@@ -37,7 +37,7 @@ app.use(rateLimit({
 }));
 app.use(cors({
   credentials: true,
-  origin: "http://localhost:3000"
+  origin: "http://www.fcahptibbursaryps.com.ng"
 }));
 
 const storage = multer.diskStorage({
@@ -307,9 +307,6 @@ app.post('/login', async(req, res)=>{
       process.env.JWT_SECRET_KEY, {
         expiresIn: "5h",
       });
-      console.log("JWT Secret on login:", process.env.JWT_SECRET_KEY);
-      console.log("Generated Token:", token);
-
       return res.status(200).json({message: "Login Successful!", token, user: admin})
   } catch (error) {
     console.error("Login Error:", error);
@@ -344,25 +341,6 @@ app.put('/reset_password', async(req, res)=>{
     return res.status(500).json({ message: e.message})
   }
 })
-
-// verify token from cookie
-app.get("/auth", (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Access Denied: No token provided" });
-    }
-
-    const token = authHeader.split(" ")[1];
-    const verified = jsonwebtoken.verify(token, process.env.secret_key);
-
-    return res.status(200).json({ authenticated: true, user: verified });
-
-  } catch (error) {
-    return res.status(403).json({ message: "Invalid or expired token", error: error.message });
-  }
-});
 
 app.get("/auth/verify", (req, res) => {
     const authHeader = req.headers.authorization;
