@@ -40,7 +40,7 @@ app.use(rateLimit({
 }));
 app.use(cors({
   credentials: true,
-  origin: "http://www.fcahptibbursaryps.com.ng"
+  origin: "https://www.fcahptibbursaryps.com.ng"
 }));
 
 const storage = multer.diskStorage({
