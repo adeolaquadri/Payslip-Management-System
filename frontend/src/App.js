@@ -9,7 +9,7 @@ import ProtectedRoute from "./components/PrivateRoute.js";
 import axios from "axios";
 import './App.css';
 
-axios.defaults.baseURL = "http://localhost:5000";
+axios.defaults.baseURL = "https://payslip-dgg7.onrender.com";
 axios.defaults.withCredentials = true;
 
 const App = () => {
